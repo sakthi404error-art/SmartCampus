@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Search, User, FileEdit, AlertCircle, UploadCloud, CheckCircle2, Loader2 } from "lucide-react";
+import { Search, User, FileEdit, AlertCircle, UploadCloud, CheckCircle2, Loader2, Database } from "lucide-react";
 import Papa from "papaparse";
 
 export default function AdminDashboard() {
@@ -14,6 +14,7 @@ export default function AdminDashboard() {
 
   // Upload State
   const [uploading, setUploading] = useState(false);
+  const [uploadTable, setUploadTable] = useState("attendance_data"); // Default to attendance
   const [uploadMessage, setUploadMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -25,17 +26,25 @@ export default function AdminDashboard() {
     setStudent(null);
 
     try {
-      const { data, error } = await supabase.from("profiles").select("*");
-      if (error) throw error;
+      // 1. Search in the master personal_data table
+      const { data: personalData, error: personalError } = await supabase.from("personal_data").select("*");
+      if (personalError) throw personalError;
 
-      const foundStudent = data?.find((s) => 
+      const foundStudent = personalData?.find((s) => 
         JSON.stringify(s).toLowerCase().includes(searchTerm.toLowerCase())
       );
 
       if (!foundStudent) {
-        setSearchError("No student found with that name or ID.");
+        setSearchError("No student found with that name or Roll Number.");
       } else {
-        setStudent(foundStudent);
+        // 2. If found, fetch their academic info to display on the card
+        const { data: acadData } = await supabase
+          .from("academic_data")
+          .select("*")
+          .eq("roll_number", foundStudent.roll_number)
+          .maybeSingle();
+          
+        setStudent({ ...foundStudent, ...acadData });
       }
     } catch (err) {
       console.error(err);
@@ -57,22 +66,20 @@ export default function AdminDashboard() {
       skipEmptyLines: true,
       complete: async (results) => {
         try {
-          // The CSV headers must match your Supabase columns (e.g., id, name, roll_number)
           const rows = results.data as any[];
           
-          // Upsert: Updates existing rows if the ID matches, or inserts new ones
-          const { error } = await supabase.from("profiles").upsert(rows);
+          // Upsert data directly into the table selected in the dropdown
+          const { error } = await supabase.from(uploadTable).upsert(rows);
           
           if (error) throw error;
           
-          setUploadMessage({ text: `Successfully updated ${rows.length} student records!`, type: "success" });
+          setUploadMessage({ text: `Successfully synced ${rows.length} records to ${uploadTable}!`, type: "success" });
         } catch (err: any) {
           console.error(err);
           setUploadMessage({ text: `Upload failed: ${err.message}`, type: "error" });
         } finally {
           setUploading(false);
-          // Reset file input
-          e.target.value = "";
+          e.target.value = ""; // Reset file input
         }
       },
       error: (error) => {
@@ -98,7 +105,7 @@ export default function AdminDashboard() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by student name..."
+              placeholder="Search by student name or roll number (e.g. MBA26001)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-sm outline-none focus:border-indigo-600 focus:bg-white"
@@ -129,9 +136,9 @@ export default function AdminDashboard() {
                   <User className="h-8 w-8" />
                 </div>
                 <div className="mt-4 sm:mt-0 sm:pt-1">
-                  <p className="text-xl font-bold text-slate-900">{student.full_name || student.name || "Unknown Student"}</p>
+                  <p className="text-xl font-bold text-slate-900">{student.full_name}</p>
                   <p className="text-sm font-medium text-slate-500">
-                    {student.programme || "MBA Systems"} · Semester {student.semester || "V"}
+                    {student.programme || "MBA"} {student.specialization ? `in ${student.specialization}` : ""} · Roll No: {student.roll_number}
                   </p>
                 </div>
               </div>
@@ -147,15 +154,31 @@ export default function AdminDashboard() {
 
       {/* Bulk Upload Section */}
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold tracking-tight">Bulk Data Import</h2>
-          <p className="text-sm text-slate-500">Upload a CSV file to update multiple student records at once.</p>
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold tracking-tight">Bulk Data Migration</h2>
+          <p className="text-sm text-slate-500">Update the relational database via CSV upload.</p>
         </div>
         
+        <div className="mb-6">
+          <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
+            <Database className="h-4 w-4" /> Select Destination Table
+          </label>
+          <select 
+            value={uploadTable}
+            onChange={(e) => setUploadTable(e.target.value)}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-indigo-600"
+          >
+            <option value="attendance_data">Attendance Data (Updates Daily)</option>
+            <option value="marks_data">Marks Data (Updates Semesterly)</option>
+            <option value="academic_data">Academic Data</option>
+            <option value="personal_data">Personal Data (Master Roster)</option>
+          </select>
+        </div>
+
         <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center transition hover:border-indigo-400 hover:bg-indigo-50/50">
           <UploadCloud className="mb-3 h-8 w-8 text-indigo-500" />
-          <p className="mb-1 text-sm font-medium text-slate-700">Click to upload CSV roster</p>
-          <p className="mb-4 text-xs text-slate-500">Headers must match database columns (e.g., id, name, roll_number)</p>
+          <p className="mb-1 text-sm font-medium text-slate-700">Click to upload CSV file</p>
+          <p className="mb-4 text-xs text-slate-500">Headers must match the {uploadTable} columns</p>
           
           <div className="relative">
             <input 
