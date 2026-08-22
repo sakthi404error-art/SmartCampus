@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Bell,
   BookOpen,
@@ -14,82 +14,77 @@ import {
   Shield,
   Users,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import Chatbot from '@/components/Chatbot';
 
 type Role = "Admin" | "Professor" | "Student";
 
-const MBA_MARKS = [
-  {
-    code: "MBA-401",
-    subject: "Enterprise Resource Planning",
-    internals: 18,
-    midterm: 22,
-    endterm: 48,
-    total: 88,
-    grade: "A",
-  },
-  {
-    code: "MBA-402",
-    subject: "Corporate Governance",
-    internals: 16,
-    midterm: 20,
-    endterm: 45,
-    total: 81,
-    grade: "A",
-  },
-  {
-    code: "MBA-403",
-    subject: "Goods and Services Tax (GST)",
-    internals: 17,
-    midterm: 19,
-    endterm: 42,
-    total: 78,
-    grade: "B+",
-  },
-  {
-    code: "MBA-404",
-    subject: "Strategic Management",
-    internals: 19,
-    midterm: 23,
-    endterm: 50,
-    total: 92,
-    grade: "A+",
-  },
-  {
-    code: "MBA-405",
-    subject: "Business Analytics",
-    internals: 15,
-    midterm: 18,
-    endterm: 40,
-    total: 73,
-    grade: "B",
-  },
-];
+const STUDENT_ID = "33333333-3333-3333-3333-333333333333";
 
-const ANNOUNCEMENTS = [
-  {
-    id: 1,
-    title: "GST workshop this Friday",
-    body: "Department of Commerce is hosting a GST filing workshop in Seminar Hall B at 2:00 PM.",
-    date: "22 Aug 2026",
-    tag: "Academic",
-  },
-  {
-    id: 2,
-    title: "ERP lab submissions due",
-    body: "Upload your SAP case study to the portal before Monday 11:59 PM. Late work will not be graded.",
-    date: "21 Aug 2026",
-    tag: "Deadline",
-  },
-  {
-    id: 3,
-    title: "Corporate Governance guest lecture",
-    body: "Industry expert session on board ethics and SEBI regulations. Attendance is compulsory for MBA II.",
-    date: "19 Aug 2026",
-    tag: "Event",
-  },
-];
+type ProfileRow = {
+  id?: string;
+  name?: string;
+  full_name?: string;
+  display_name?: string;
+  semester?: string | number;
+  roll_number?: string;
+  roll_no?: string;
+  roll?: string;
+  programme?: string;
+  program?: string;
+  course?: string;
+};
+
+type MarkRow = {
+  id?: number | string;
+  student_id?: string;
+  code?: string;
+  course_code?: string;
+  subject?: string;
+  subject_name?: string;
+  course?: string;
+  internals?: number;
+  internal?: number;
+  midterm?: number;
+  mid?: number;
+  endterm?: number;
+  end?: number;
+  external?: number;
+  total?: number;
+  marks?: number;
+  score?: number;
+  grade?: string;
+};
+
+type AnnouncementRow = {
+  id?: number | string;
+  title?: string;
+  body?: string;
+  content?: string;
+  message?: string;
+  date?: string;
+  created_at?: string;
+  tag?: string;
+  category?: string;
+};
 
 const ATTENDANCE = 86;
+
+function firstValue<T>(...values: Array<T | null | undefined>): T | undefined {
+  return values.find((value) => value !== null && value !== undefined);
+}
+
+function formatDate(value?: string) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 function gradeColor(grade: string) {
   if (grade.startsWith("A")) return "bg-emerald-50 text-emerald-700 ring-emerald-100";
@@ -97,17 +92,133 @@ function gradeColor(grade: string) {
   return "bg-amber-50 text-amber-700 ring-amber-100";
 }
 
+function applyChange<T extends { id?: number | string }>(
+  rows: T[],
+  payload: RealtimePostgresChangesPayload<T>,
+): T[] {
+  if (payload.eventType === "INSERT") {
+    const next = payload.new as T;
+    if (next.id != null && rows.some((row) => row.id === next.id)) {
+      return rows.map((row) => (row.id === next.id ? next : row));
+    }
+    return [...rows, next];
+  }
+
+  if (payload.eventType === "UPDATE") {
+    const next = payload.new as T;
+    if (next.id == null) return rows;
+    if (rows.some((row) => row.id === next.id)) {
+      return rows.map((row) => (row.id === next.id ? next : row));
+    }
+    return [...rows, next];
+  }
+
+  if (payload.eventType === "DELETE") {
+    const previous = payload.old as T;
+    return rows.filter((row) => row.id !== previous.id);
+  }
+
+  return rows;
+}
+
+function applyMarksChange(
+  rows: MarkRow[],
+  payload: RealtimePostgresChangesPayload<MarkRow>,
+): MarkRow[] {
+  const next = payload.new as MarkRow;
+  const previous = payload.old as MarkRow;
+
+  if (payload.eventType === "INSERT" && next.student_id !== STUDENT_ID) {
+    return rows;
+  }
+
+  if (payload.eventType === "UPDATE" && next.student_id !== STUDENT_ID) {
+    return rows.filter((row) => row.id !== (next.id ?? previous.id));
+  }
+
+  if (payload.eventType === "DELETE" && previous.student_id && previous.student_id !== STUDENT_ID) {
+    return rows;
+  }
+
+  return applyChange(rows, payload);
+}
+
 export default function Home() {
   const [role, setRole] = useState<Role>("Student");
   const [open, setOpen] = useState(false);
+  const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [marks, setMarks] = useState<MarkRow[]>([]);
+  const [announcements, setAnnouncements] = useState<AnnouncementRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDashboard() {
+      setLoading(true);
+      setError(null);
+
+      const [profileResult, marksResult, announcementsResult] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", STUDENT_ID).maybeSingle(),
+        supabase.from("marks").select("*").eq("student_id", STUDENT_ID),
+        supabase.from("announcements").select("*"),
+      ]);
+
+      if (cancelled) return;
+
+      const firstError =
+        profileResult.error?.message ??
+        marksResult.error?.message ??
+        announcementsResult.error?.message;
+
+      if (firstError) {
+        setError(firstError);
+        setProfile(null);
+        setMarks([]);
+        setAnnouncements([]);
+      } else {
+        setProfile((profileResult.data as ProfileRow) ?? null);
+        setMarks((marksResult.data as MarkRow[]) ?? []);
+        setAnnouncements((announcementsResult.data as AnnouncementRow[]) ?? []);
+      }
+
+      setLoading(false);
+    }
+
+    void loadDashboard();
+
+    const channel = supabase
+      .channel("dashboard-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "marks" },
+        (payload: RealtimePostgresChangesPayload<MarkRow>) => {
+          setMarks((current) => applyMarksChange(current, payload));
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "announcements" },
+        (payload: RealtimePostgresChangesPayload<AnnouncementRow>) => {
+          setAnnouncements((current) => applyChange(current, payload));
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
+  }, []);
 
   const gpa = useMemo(() => {
+    if (marks.length === 0) return "—";
     const points: Record<string, number> = { "A+": 10, A: 9, "B+": 8, B: 7 };
     const avg =
-      MBA_MARKS.reduce((sum, row) => sum + (points[row.grade] ?? 6), 0) /
-      MBA_MARKS.length;
+      marks.reduce((sum, row) => sum + (points[row.grade ?? ""] ?? 6), 0) / marks.length;
     return avg.toFixed(2);
-  }, []);
+  }, [marks]);
 
   return (
     <div className="min-h-full bg-slate-50 text-slate-900">
@@ -169,10 +280,20 @@ export default function Home() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        {role === "Student" ? <StudentView gpa={gpa} /> : null}
+        {role === "Student" ? (
+          <StudentView
+            profile={profile}
+            gpa={gpa}
+            marks={marks}
+            announcements={announcements}
+            loading={loading}
+            error={error}
+          />
+        ) : null}
         {role === "Professor" ? <ProfessorView /> : null}
         {role === "Admin" ? <AdminView /> : null}
       </main>
+      <Chatbot />
     </div>
   );
 }
@@ -183,20 +304,51 @@ function RoleIcon({ role }: { role: Role }) {
   return <GraduationCap className="h-4 w-4 text-indigo-600" />;
 }
 
-function StudentView({ gpa }: { gpa: string }) {
+function StudentView({
+  profile,
+  gpa,
+  marks,
+  announcements,
+  loading,
+  error,
+}: {
+  profile: ProfileRow | null;
+  gpa: string;
+  marks: MarkRow[];
+  announcements: AnnouncementRow[];
+  loading: boolean;
+  error: string | null;
+}) {
+  const studentName = firstValue(profile?.full_name, profile?.name, profile?.display_name);
+  const semester = profile?.semester != null ? String(profile.semester) : null;
+  const rollNumber = firstValue(profile?.roll_number, profile?.roll_no, profile?.roll);
+  const programme = firstValue(profile?.programme, profile?.program, profile?.course) ?? "MBA";
+
   return (
     <div className="space-y-6">
       <section className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-medium text-indigo-600">Student View</p>
-          <h1 className="text-2xl font-semibold tracking-tight">Welcome back, Aisha</h1>
-          <p className="text-sm text-slate-500">MBA · Semester IV · Roll No. MBA24-118</p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {loading ? "Loading profile…" : `Welcome back, ${studentName ?? "student"}`}
+          </h1>
+          <p className="text-sm text-slate-500">
+            {programme}
+            {semester ? ` · Semester ${semester}` : ""}
+            {rollNumber ? ` · Roll No. ${rollNumber}` : ""}
+          </p>
         </div>
         <div className="flex gap-3">
           <StatChip icon={<LayoutDashboard className="h-4 w-4" />} label="CGPA" value={gpa} />
           <StatChip icon={<Calendar className="h-4 w-4" />} label="Term" value="Fall 2026" />
         </div>
       </section>
+
+      {error ? (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="lg:col-span-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -221,23 +373,48 @@ function StudentView({ gpa }: { gpa: string }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {MBA_MARKS.map((row) => (
-                  <tr key={row.code} className="hover:bg-slate-50/80">
-                    <td className="px-5 py-3 font-mono text-xs text-slate-500">{row.code}</td>
-                    <td className="px-5 py-3 font-medium">{row.subject}</td>
-                    <td className="px-5 py-3 text-slate-600">{row.internals}</td>
-                    <td className="px-5 py-3 text-slate-600">{row.midterm}</td>
-                    <td className="px-5 py-3 text-slate-600">{row.endterm}</td>
-                    <td className="px-5 py-3 font-semibold">{row.total}</td>
-                    <td className="px-5 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${gradeColor(row.grade)}`}
-                      >
-                        {row.grade}
-                      </span>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
+                      Loading marks…
                     </td>
                   </tr>
-                ))}
+                ) : marks.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
+                      No marks found.
+                    </td>
+                  </tr>
+                ) : (
+                  marks.map((row, index) => {
+                    const code = firstValue(row.code, row.course_code) ?? "—";
+                    const subject =
+                      firstValue(row.subject, row.subject_name, row.course) ?? "—";
+                    const internals = firstValue(row.internals, row.internal) ?? "—";
+                    const midterm = firstValue(row.midterm, row.mid) ?? "—";
+                    const endterm = firstValue(row.endterm, row.end, row.external) ?? "—";
+                    const total = firstValue(row.total, row.marks, row.score) ?? "—";
+                    const grade = row.grade ?? "—";
+
+                    return (
+                      <tr key={row.id ?? `${code}-${index}`} className="hover:bg-slate-50/80">
+                        <td className="px-5 py-3 font-mono text-xs text-slate-500">{code}</td>
+                        <td className="px-5 py-3 font-medium">{subject}</td>
+                        <td className="px-5 py-3 text-slate-600">{internals}</td>
+                        <td className="px-5 py-3 text-slate-600">{midterm}</td>
+                        <td className="px-5 py-3 text-slate-600">{endterm}</td>
+                        <td className="px-5 py-3 font-semibold">{total}</td>
+                        <td className="px-5 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${gradeColor(grade)}`}
+                          >
+                            {grade}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -269,23 +446,41 @@ function StudentView({ gpa }: { gpa: string }) {
               <Megaphone className="h-4 w-4 text-indigo-600" />
               <h2 className="font-semibold">Announcements</h2>
             </div>
-            <ul className="space-y-4">
-              {ANNOUNCEMENTS.map((item) => (
-                <li key={item.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium">{item.title}</p>
-                    <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-indigo-600 ring-1 ring-indigo-100">
-                      {item.tag}
-                    </span>
-                  </div>
-                  <p className="text-xs leading-5 text-slate-600">{item.body}</p>
-                  <p className="mt-2 inline-flex items-center gap-1 text-[11px] text-slate-400">
-                    <Bell className="h-3 w-3" />
-                    {item.date}
-                  </p>
-                </li>
-              ))}
-            </ul>
+            {loading ? (
+              <p className="text-sm text-slate-500">Loading announcements…</p>
+            ) : announcements.length === 0 ? (
+              <p className="text-sm text-slate-500">No announcements yet.</p>
+            ) : (
+              <ul className="space-y-4">
+                {announcements.map((item, index) => {
+                  const title = item.title ?? "Announcement";
+                  const body = firstValue(item.body, item.content, item.message) ?? "";
+                  const tag = firstValue(item.tag, item.category) ?? "Notice";
+                  const date = formatDate(firstValue(item.date, item.created_at));
+
+                  return (
+                    <li
+                      key={item.id ?? `${title}-${index}`}
+                      className="rounded-xl border border-slate-100 bg-slate-50 p-3"
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium">{title}</p>
+                        <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-indigo-600 ring-1 ring-indigo-100">
+                          {tag}
+                        </span>
+                      </div>
+                      {body ? <p className="text-xs leading-5 text-slate-600">{body}</p> : null}
+                      {date ? (
+                        <p className="mt-2 inline-flex items-center gap-1 text-[11px] text-slate-400">
+                          <Bell className="h-3 w-3" />
+                          {date}
+                        </p>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
         </div>
       </div>
