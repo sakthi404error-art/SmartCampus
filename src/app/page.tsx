@@ -15,19 +15,20 @@ import Chatbot from '@/components/Chatbot';
 import CourseMaterials from "@/components/CourseMaterials";
 import Login from "@/components/Login";
 import AdminDashboard from "@/components/AdminDashboard";
+import LeaveRequest from "@/components/LeaveRequest";
+import Helpdesk from "@/components/Helpdesk";
+import Timetable from "@/components/Timetable";
 
-// --- Types matching your new SQL Tables ---
 type PersonalData = { roll_number: string; full_name: string; email: string; city: string; };
 type AcademicData = { programme: string; specialization: string; current_semester: string; section: string; };
 type AttendanceData = { total_sessions: number; sessions_attended: number; attendance_percentage: number; };
 type MarkRow = { id: string; subject_code: string; subject_name: string; internals: number; midterm: number; endterm: number; total_score: number; grade: string; };
 
-// Define designated admin emails here
-const ADMIN_EMAILS = ["sakthirp.official@gmail.com", "sakthi@example.com"]; // You can add your actual admin/testing email here
+const ADMIN_EMAILS = ["sakthirp.official@gmail.com"];
 
 export default function Home() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
-const [role, setRole] = useState<"Student" | "Admin">("Student");
+  const [role, setRole] = useState<"Student" | "Admin">("Student");
   
   const [personal, setPersonal] = useState<PersonalData | null>(null);
   const [academic, setAcademic] = useState<AcademicData | null>(null);
@@ -37,7 +38,6 @@ const [role, setRole] = useState<"Student" | "Admin">("Student");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if user is already logged in on page load
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -45,7 +45,6 @@ const [role, setRole] = useState<"Student" | "Admin">("Student");
         const email = session.user.email;
         setUserEmail(email);
         
-        // Determine role automatically
         if (ADMIN_EMAILS.includes(email.toLowerCase())) {
           setRole("Admin");
         } else {
@@ -56,7 +55,6 @@ const [role, setRole] = useState<"Student" | "Admin">("Student");
     checkUser();
   }, []);
 
-  // Fetch data from the 4 new tables if user is a student
   useEffect(() => {
     if (!userEmail || role === "Admin") return;
 
@@ -66,7 +64,6 @@ const [role, setRole] = useState<"Student" | "Admin">("Student");
       setLoading(true);
       setError(null);
 
-      // 1. Get Personal Data (which gives us the roll_number)
       const { data: personalData, error: personalError } = await supabase
         .from("personal_data")
         .select("*")
@@ -83,7 +80,6 @@ const [role, setRole] = useState<"Student" | "Admin">("Student");
 
       const rollNumber = personalData.roll_number;
 
-      // 2. Fetch Academic, Attendance, and Marks using the roll_number
       const [academicRes, attendanceRes, marksRes] = await Promise.all([
         supabase.from("academic_data").select("*").eq("roll_number", rollNumber).maybeSingle(),
         supabase.from("attendance_data").select("*").eq("roll_number", rollNumber).maybeSingle(),
@@ -113,7 +109,6 @@ const [role, setRole] = useState<"Student" | "Admin">("Student");
     setRole("Student");
   };
 
-  // If not logged in, show the Login Component
   if (!userEmail) {
     return <Login />;
   }
@@ -240,61 +235,54 @@ function StudentView({
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <section className="lg:col-span-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-            <div className="flex items-center gap-2">
-              <ClipboardList className="h-4 w-4 text-indigo-600" />
-              <h2 className="font-semibold">Academic Performance</h2>
+        {/* Left Column: Marks & Timetable (Spans 2 columns) */}
+        <div className="lg:col-span-2 space-y-6">
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-indigo-600" />
+                <h2 className="font-semibold">Academic Performance</h2>
+              </div>
             </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Code</th>
-                  <th className="px-5 py-3 font-medium">Subject</th>
-                  <th className="px-5 py-3 font-medium">Int.</th>
-                  <th className="px-5 py-3 font-medium">Mid</th>
-                  <th className="px-5 py-3 font-medium">End</th>
-                  <th className="px-5 py-3 font-medium">Total</th>
-                  <th className="px-5 py-3 font-medium">Grade</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
-                      Loading marks…
-                    </td>
+                    <th className="px-5 py-3 font-medium">Code</th>
+                    <th className="px-5 py-3 font-medium">Subject</th>
+                    <th className="px-5 py-3 font-medium">Total</th>
+                    <th className="px-5 py-3 font-medium">Grade</th>
                   </tr>
-                ) : marks.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
-                      No marks found.
-                    </td>
-                  </tr>
-                ) : (
-                  marks.map((row, index) => (
-                    <tr key={row.id ?? index} className="hover:bg-slate-50/80">
-                      <td className="px-5 py-3 font-mono text-xs text-slate-500">{row.subject_code}</td>
-                      <td className="px-5 py-3 font-medium">{row.subject_name}</td>
-                      <td className="px-5 py-3 text-slate-600">{row.internals}</td>
-                      <td className="px-5 py-3 text-slate-600">{row.midterm}</td>
-                      <td className="px-5 py-3 text-slate-600">{row.endterm}</td>
-                      <td className="px-5 py-3 font-semibold">{row.total_score}</td>
-                      <td className="px-5 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${row.grade === 'O' || row.grade === 'A+' ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-sky-50 text-sky-700 ring-sky-100'}`}>
-                          {row.grade}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {loading ? (
+                    <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-500">Loading marks…</td></tr>
+                  ) : marks.length === 0 ? (
+                    <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-500">No marks found.</td></tr>
+                  ) : (
+                    marks.map((row, index) => (
+                      <tr key={row.id ?? index} className="hover:bg-slate-50/80">
+                        <td className="px-5 py-3 font-mono text-xs text-slate-500">{row.subject_code}</td>
+                        <td className="px-5 py-3 font-medium">{row.subject_name}</td>
+                        <td className="px-5 py-3 font-semibold">{row.total_score}</td>
+                        <td className="px-5 py-3">
+                          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${row.grade === 'O' || row.grade === 'A+' ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-sky-50 text-sky-700 ring-sky-100'}`}>
+                            {row.grade}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
 
+          {/* TIMETABLE VIEWER */}
+          <Timetable specialization={specialization} semester={semester} />
+        </div>
+
+        {/* Right Column: Attendance & Course Materials */}
         <div className="space-y-6">
           <section className={`rounded-2xl border p-5 shadow-sm transition-colors ${statusBg}`}>
             <div className="mb-4 flex items-center gap-2">
@@ -306,18 +294,19 @@ function StudentView({
               <p className={`text-xs font-medium ${statusText}`}>Required: 75%</p>
             </div>
             <div className="h-3 overflow-hidden rounded-full bg-white/60">
-              <div
-                className={`h-full rounded-full bg-gradient-to-r ${statusColor} transition-all duration-1000 ease-out`}
-                style={{ width: `${attendancePct}%` }}
-              />
+              <div className={`h-full rounded-full bg-gradient-to-r ${statusColor} transition-all duration-1000 ease-out`} style={{ width: `${attendancePct}%` }} />
             </div>
-            <p className={`mt-3 text-sm font-medium ${statusText}`}>
-              {statusMessage}
-            </p>
+            <p className={`mt-3 text-sm font-medium ${statusText}`}>{statusMessage}</p>
           </section>
           
           <CourseMaterials canUpload={false} subjectCode="MBA401"/>
         </div>
+      </div>
+
+      {/* NEW: Leave & Helpdesk Modules */}
+      <div className="mt-6 space-y-6">
+        <LeaveRequest rollNumber={rollNumber} />
+        <Helpdesk rollNumber={rollNumber} />
       </div>
     </div>
   );
