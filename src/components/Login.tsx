@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { GraduationCap, Mail, Lock, Loader2, ArrowRight, ShieldCheck } from "lucide-react";
+import { Mail, Lock, Loader2, ArrowRight, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Login() {
@@ -36,7 +36,7 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen w-full bg-white">
-      {/* Left Panel - High Contrast Branding */}
+      {/* Left Panel - High Contrast Branding (GENERIC FOR ALL USERS) */}
       <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-slate-900 p-12 lg:flex">
         {/* Cinematic Background Glow */}
         <div className="absolute -left-1/4 -top-1/4 h-3/4 w-3/4 rounded-full bg-indigo-600/20 blur-[120px]"></div>
@@ -58,14 +58,15 @@ export default function Login() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="relative z-10"
         >
+          {/* REMOVED SPECIFIC NAME - NOW GENERIC */}
           <h2 className="mb-4 text-5xl font-extrabold leading-tight text-white">
-            Welcome Future <br />
+            Welcome to <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
-              Business Leader
+              ISSM Smart
             </span>
           </h2>
           <p className="text-xl font-medium text-slate-300">
-            Mr. Sakthi R P
+            Empowering Future Business Leaders.
           </p>
           <div className="mt-8 flex items-center gap-2 text-sm font-semibold text-slate-400">
             <ShieldCheck className="h-5 w-5 text-emerald-400" /> Enterprise-Grade Security
@@ -76,7 +77,7 @@ export default function Login() {
       {/* Right Panel - Auth Form */}
       <div className="flex w-full flex-col justify-center px-8 sm:px-16 lg:w-1/2 xl:px-32">
         <div className="mx-auto w-full max-w-sm">
-          {/* Mobile Logo (Only shows on small screens) */}
+          {/* Mobile Logo */}
           <div className="mb-8 flex items-center gap-3 lg:hidden">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1.5 shadow-sm border border-slate-200">
               <img src="/issm-logo.png" alt="ISSM Logo" className="h-full w-full object-contain" />
