@@ -17,6 +17,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import Chatbot from '@/components/Chatbot';
+import CourseMaterials from "@/components/CourseMaterials";
+import AdminDashboard from "@/components/AdminDashboard";
 
 type Role = "Admin" | "Professor" | "Student";
 
@@ -34,6 +36,7 @@ type ProfileRow = {
   programme?: string;
   program?: string;
   course?: string;
+  attendance?: number;
 };
 
 type MarkRow = {
@@ -291,7 +294,7 @@ export default function Home() {
           />
         ) : null}
         {role === "Professor" ? <ProfessorView /> : null}
-        {role === "Admin" ? <AdminView /> : null}
+        {role === "Admin" ? <AdminDashboard /> : null}
       </main>
       <Chatbot />
     </div>
@@ -323,7 +326,25 @@ function StudentView({
   const semester = profile?.semester != null ? String(profile.semester) : null;
   const rollNumber = firstValue(profile?.roll_number, profile?.roll_no, profile?.roll);
   const programme = firstValue(profile?.programme, profile?.program, profile?.course) ?? "MBA";
+// Determine attendance status and colors
+const attendancePct = profile?.attendance ?? 0; // Pulls from DB, defaults to 0 if empty
+  
+let statusColor = "from-emerald-400 to-emerald-500"; // Safe (Green)
+let statusBg = "bg-emerald-50 border-emerald-200";
+let statusText = "text-emerald-700";
+let statusMessage = "You are safely above the minimum cutoff.";
 
+if (attendancePct < 75 && attendancePct >= 65) {
+  statusColor = "from-amber-400 to-amber-500"; // Warning (Amber)
+  statusBg = "bg-amber-50 border-amber-200";
+  statusText = "text-amber-700";
+  statusMessage = "Warning: You are at risk. Please ensure you attend upcoming sessions.";
+} else if (attendancePct < 65 && attendancePct > 0) {
+  statusColor = "from-red-500 to-red-600"; // Danger (Red)
+  statusBg = "bg-red-50 border-red-200";
+  statusText = "text-red-700";
+  statusMessage = "Critical Shortage: You are currently ineligible for semester exams.";
+}
   return (
     <div className="space-y-6">
       <section className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -356,6 +377,7 @@ function StudentView({
             <div className="flex items-center gap-2">
               <ClipboardList className="h-4 w-4 text-indigo-600" />
               <h2 className="font-semibold">MBA Marks</h2>
+              <CourseMaterials canUpload={false} subjectCode="MBA-401"/>
             </div>
             <span className="text-xs text-slate-500">Internal · Mid · End · Total / 100</span>
           </div>
@@ -421,23 +443,23 @@ function StudentView({
         </section>
 
         <div className="space-y-6">
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className={`rounded-2xl border p-5 shadow-sm transition-colors ${statusBg}`}>
             <div className="mb-4 flex items-center gap-2">
-              <Users className="h-4 w-4 text-indigo-600" />
-              <h2 className="font-semibold">Attendance</h2>
+              <Users className={`h-4 w-4 ${statusText}`} />
+              <h2 className={`font-semibold ${statusText}`}>Attendance Status</h2>
             </div>
             <div className="mb-2 flex items-end justify-between">
-              <p className="text-3xl font-semibold tracking-tight">{ATTENDANCE}%</p>
-              <p className="text-xs text-slate-500">Minimum required: 75%</p>
+              <p className={`text-3xl font-semibold tracking-tight ${statusText}`}>{attendancePct}%</p>
+              <p className={`text-xs font-medium ${statusText}`}>Required: 75%</p>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-3 overflow-hidden rounded-full bg-white/60">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
-                style={{ width: `${ATTENDANCE}%` }}
+                className={`h-full rounded-full bg-gradient-to-r ${statusColor} transition-all duration-1000 ease-out`}
+                style={{ width: `${attendancePct}%` }}
               />
             </div>
-            <p className="mt-3 text-sm text-slate-600">
-              43 of 50 sessions attended. You are safely above the cutoff.
+            <p className={`mt-3 text-sm font-medium ${statusText}`}>
+              {statusMessage}
             </p>
           </section>
 
@@ -525,30 +547,7 @@ function ProfessorView() {
             </div>
           ),
         )}
-      </div>
-    </section>
-  );
-}
-
-function AdminView() {
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-      <p className="text-sm font-medium text-indigo-600">Admin View</p>
-      <h1 className="mt-1 text-2xl font-semibold">Campus overview</h1>
-      <p className="mt-2 max-w-xl text-sm text-slate-500">
-        Manage users, roles, and academic calendars. This is a preview panel for the role switcher.
-      </p>
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        {[
-          { label: "Active students", value: "1,284" },
-          { label: "Faculty", value: "96" },
-          { label: "Open tickets", value: "12" },
-        ].map((item) => (
-          <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{item.label}</p>
-            <p className="mt-1 text-2xl font-semibold">{item.value}</p>
-          </div>
-        ))}
+        <CourseMaterials canUpload={true} subjectCode="MBA-401"/>
       </div>
     </section>
   );
