@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Calendar, ClipboardList, GraduationCap, LayoutDashboard,
-  Users, LogOut, ShieldAlert, BookOpen, MessageSquareWarning, CalendarDays, Bell, UserCircle
+  Users, LogOut, ShieldAlert, BookOpen, MessageSquareWarning, CalendarDays, Bell, UserCircle, Loader2
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
@@ -89,6 +89,44 @@ export default function Home() {
 
   if (!userEmail) return <Login />;
 
+  // 🚀 SECURE BLOCK 1: Show a loading screen while checking the database
+  // This prevents the empty dashboard from flashing on the screen.
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  // 🚀 SECURE BLOCK 2: The Hard Stop for Unregistered Emails
+  if (role === "Student" && error && !personal) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+        <div className="w-full max-w-md rounded-3xl border border-red-100 bg-white p-8 text-center shadow-xl">
+          <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-red-50">
+            <ShieldAlert className="h-10 w-10 text-red-500" />
+          </div>
+          <h2 className="mb-2 text-2xl font-bold tracking-tight text-slate-900">Access Restricted</h2>
+          <p className="mb-6 text-sm text-slate-600">
+            The email address <span className="font-semibold text-slate-900">{userEmail}</span> is not registered in the official campus database.
+          </p>
+          <div className="mb-8 rounded-xl bg-slate-50 p-4 text-xs font-medium text-slate-500 border border-slate-100 text-left">
+            <strong className="text-slate-700 block mb-1">Security Policy:</strong> 
+            Only pre-authorized students mapped to a valid Roll Number can access the ISSM Smart portal. Please log in with your official ID.
+          </div>
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition-all hover:bg-red-600"
+          >
+            <LogOut className="h-4 w-4" /> Sign Out & Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // If they pass the checks, let them into the app!
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
       {role === "Admin" ? (
