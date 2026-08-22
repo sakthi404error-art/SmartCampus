@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Search, User, FileEdit, AlertCircle, UploadCloud, CheckCircle2, Loader2, Database, XCircle, CalendarClock, Briefcase, MessageSquareWarning, Filter, Clock, CheckCircle } from "lucide-react";
 import Papa from "papaparse";
+import ProfileUploader from "./ProfileUploader";
+import BulkStudentUploader from "./BulkStudentUploader";
+import AdminLeaveQueue from "./AdminLeaveQueue";
 
 export default function AdminDashboard() {
   // Search State
@@ -271,7 +274,9 @@ export default function AdminDashboard() {
           </div>
         )}
       </section>
-
+      <ProfileUploader/>
+      <BulkStudentUploader/>
+      <AdminLeaveQueue/>
       {/* 4. BULK UPLOAD SECTION (Remains unchanged) */}
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-6">

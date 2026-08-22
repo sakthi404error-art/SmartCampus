@@ -2,99 +2,150 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Mail, Loader2, ArrowRight, AlertCircle, GraduationCap, CheckCircle2 } from "lucide-react";
+import { GraduationCap, Mail, Lock, Loader2, ArrowRight, ShieldCheck } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function Login() {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "sent">("idle");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleMagicLink = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
-
-    setStatus("loading");
+    setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: window.location.origin, // Redirects back to localhost:3000
-      },
-    });
-
-    if (error) {
-      setError(error.message);
-      setStatus("idle");
-    } else {
-      setStatus("sent");
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        alert("Account created successfully! You can now sign in.");
+        setIsSignUp(false);
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+    } catch (err: any) {
+      setError(err.message || "An error occurred during authentication.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
-            <GraduationCap className="h-6 w-6" />
+    <div className="flex min-h-screen w-full bg-white">
+      {/* Left Panel - High Contrast Branding */}
+      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-slate-900 p-12 lg:flex">
+        {/* Cinematic Background Glow */}
+        <div className="absolute -left-1/4 -top-1/4 h-3/4 w-3/4 rounded-full bg-indigo-600/20 blur-[120px]"></div>
+        <div className="absolute -bottom-1/4 -right-1/4 h-3/4 w-3/4 rounded-full bg-blue-600/20 blur-[120px]"></div>
+
+        <div className="relative z-10 flex items-center gap-3 text-white">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 shadow-lg">
+            <GraduationCap className="h-6 w-6 text-white" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">College Portal Access</h1>
-          <p className="mt-2 text-sm text-slate-500">Secure Passwordless Login</p>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">ISSM Smart</h1>
+            <p className="text-xs font-semibold uppercase tracking-widest text-indigo-300">Campus Portal</p>
+          </div>
         </div>
 
-        {error && (
-          <div className="mb-6 flex items-center gap-2 rounded-lg bg-red-50 p-4 text-sm text-red-700">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <p>{error}</p>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="relative z-10"
+        >
+          <h2 className="mb-4 text-5xl font-extrabold leading-tight text-white">
+            Welcome Future <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
+              Business Leader
+            </span>
+          </h2>
+          <p className="text-xl font-medium text-slate-300">
+            Mr. Sakthi R P
+          </p>
+          <div className="mt-8 flex items-center gap-2 text-sm font-semibold text-slate-400">
+            <ShieldCheck className="h-5 w-5 text-emerald-400" /> Enterprise-Grade Security
           </div>
-        )}
+        </motion.div>
+      </div>
 
-        {status === "sent" ? (
-          <div className="flex flex-col items-center text-center">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-              <CheckCircle2 className="h-6 w-6" />
+      {/* Right Panel - Auth Form */}
+      <div className="flex w-full flex-col justify-center px-8 sm:px-16 lg:w-1/2 xl:px-32">
+        <div className="mx-auto w-full max-w-sm">
+          {/* Mobile Logo (Only shows on small screens) */}
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600">
+              <GraduationCap className="h-5 w-5 text-white" />
             </div>
-            <h2 className="mb-2 text-lg font-semibold text-slate-900">Check your inbox</h2>
-            <p className="mb-6 text-sm text-slate-500">
-              We sent a secure magic link to <strong>{email}</strong>. Click the link in that email to instantly log in.
-            </p>
-            <button
-              onClick={() => setStatus("idle")}
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-            >
-              Use a different email
-            </button>
+            <h1 className="text-xl font-bold text-slate-900">ISSM Smart</h1>
           </div>
-        ) : (
-          <form onSubmit={handleMagicLink} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="mb-2 block text-sm font-medium text-slate-700">
-                Institutional Email
-              </label>
+
+          <h2 className="text-2xl font-bold text-slate-900">
+            {isSignUp ? "Create an Account" : "Sign In"}
+          </h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Enter your credentials to access the portal.
+          </p>
+
+          <form onSubmit={handleAuth} className="mt-8 space-y-5">
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <label className="text-sm font-semibold text-slate-700">Email Address</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                <Mail className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
                 <input
-                  id="email"
                   type="email"
                   required
-                  placeholder="name@student.edu"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                  className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none transition-all focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                  placeholder="name@example.com"
                 />
               </div>
             </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-semibold text-slate-700">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none transition-all focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+
             <button
               type="submit"
-              disabled={status === "loading"}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition-all hover:bg-indigo-600 disabled:opacity-50"
             >
-              {status === "loading" ? <Loader2 className="h-5 w-5 animate-spin" /> : "Send Magic Link"}
-              {status !== "loading" && <ArrowRight className="h-4 w-4" />}
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+                <>{isSignUp ? "Sign Up" : "Sign In"} <ArrowRight className="h-4 w-4" /></>
+              )}
             </button>
           </form>
-        )}
+
+            <button
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="mt-6 w-full text-center text-sm font-medium text-slate-500 hover:text-indigo-600"
+            >
+              {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up"}
+            </button>
+        </div>
       </div>
     </div>
   );

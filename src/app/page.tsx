@@ -1,25 +1,24 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import {
-  Calendar,
-  ClipboardList,
-  GraduationCap,
-  LayoutDashboard,
-  Users,
-  LogOut,
-  ShieldAlert,
+  Calendar, ClipboardList, GraduationCap, LayoutDashboard,
+  Users, LogOut, ShieldAlert, BookOpen, MessageSquareWarning, CalendarDays, Bell, UserCircle
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { motion, AnimatePresence } from "framer-motion";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+
+// Components
 import Chatbot from '@/components/Chatbot';
-import CourseMaterials from "@/components/CourseMaterials";
 import Login from "@/components/Login";
 import AdminDashboard from "@/components/AdminDashboard";
 import LeaveRequest from "@/components/LeaveRequest";
 import Helpdesk from "@/components/Helpdesk";
 import Timetable from "@/components/Timetable";
+import CourseMaterials from "@/components/CourseMaterials";
 
-type PersonalData = { roll_number: string; full_name: string; email: string; city: string; };
+type PersonalData = { roll_number: string; full_name: string; email: string; city: string; profile_pic_url?: string };
 type AcademicData = { programme: string; specialization: string; current_semester: string; section: string; };
 type AttendanceData = { total_sessions: number; sessions_attended: number; attendance_percentage: number; };
 type MarkRow = { id: string; subject_code: string; subject_name: string; internals: number; midterm: number; endterm: number; total_score: number; grade: string; };
@@ -42,14 +41,8 @@ export default function Home() {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email) {
-        const email = session.user.email;
-        setUserEmail(email);
-        
-        if (ADMIN_EMAILS.includes(email.toLowerCase())) {
-          setRole("Admin");
-        } else {
-          setRole("Student");
-        }
+        setUserEmail(session.user.email);
+        setRole(ADMIN_EMAILS.includes(session.user.email.toLowerCase()) ? "Admin" : "Student");
       }
     };
     checkUser();
@@ -57,29 +50,18 @@ export default function Home() {
 
   useEffect(() => {
     if (!userEmail || role === "Admin") return;
-
     let cancelled = false;
 
     async function loadDashboard() {
       setLoading(true);
       setError(null);
-
-      const { data: personalData, error: personalError } = await supabase
-        .from("personal_data")
-        .select("*")
-        .eq("email", userEmail)
-        .maybeSingle();
+      const { data: personalData, error: personalError } = await supabase.from("personal_data").select("*").eq("email", userEmail).maybeSingle();
 
       if (personalError || !personalData) {
-        if (!cancelled) {
-          setError("Profile not found in database. Contact admin.");
-          setLoading(false);
-        }
+        if (!cancelled) { setError("Profile not found. Contact admin."); setLoading(false); }
         return;
       }
-
       const rollNumber = personalData.roll_number;
-
       const [academicRes, attendanceRes, marksRes] = await Promise.all([
         supabase.from("academic_data").select("*").eq("roll_number", rollNumber).maybeSingle(),
         supabase.from("attendance_data").select("*").eq("roll_number", rollNumber).maybeSingle(),
@@ -94,12 +76,8 @@ export default function Home() {
         setLoading(false);
       }
     }
-
     void loadDashboard();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [userEmail, role]);
 
   const handleLogout = async () => {
@@ -109,217 +87,304 @@ export default function Home() {
     setRole("Student");
   };
 
-  if (!userEmail) {
-    return <Login />;
-  }
-
-  const gpa = "8.42";
+  if (!userEmail) return <Login />;
 
   return (
-    <div className="min-h-full bg-slate-50 text-slate-900">
-      <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
-              <GraduationCap className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold tracking-tight">ISSM Business School</p>
-              <p className="text-xs text-slate-500">
-                {role === "Admin" ? "Admin Control Center" : "Student Portal"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {role === "Admin" && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
-                <ShieldAlert className="h-3.5 w-3.5" /> Admin Mode
-              </span>
-            )}
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Sign Out</span>
+    <div className="flex min-h-screen bg-slate-50 text-slate-900">
+      {role === "Admin" ? (
+        <div className="w-full max-w-6xl mx-auto py-8 px-4 sm:px-6">
+          <div className="mb-6 flex items-center justify-between">
+            <h1 className="text-2xl font-bold flex items-center gap-2"><ShieldAlert className="h-6 w-6 text-indigo-600"/> Admin Control Center</h1>
+            <button onClick={handleLogout} className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium border border-slate-200 text-slate-700 shadow-sm hover:bg-slate-50">
+              <LogOut className="h-4 w-4" /> Sign Out
             </button>
           </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        {role === "Admin" ? (
           <AdminDashboard />
-        ) : (
-          <StudentView
-            personal={personal}
-            academic={academic}
-            attendance={attendance}
-            gpa={gpa}
-            marks={marks}
-            loading={loading}
-            error={error}
-          />
-        )}
-      </main>
+        </div>
+      ) : (
+        <StudentShell 
+          personal={personal} academic={academic} attendance={attendance} 
+          marks={marks} loading={loading} error={error} handleLogout={handleLogout} 
+        />
+      )}
       {role === "Student" && <Chatbot />}
     </div>
   );
 }
 
-function StudentView({
-  personal,
-  academic,
-  attendance,
-  gpa,
-  marks,
-  loading,
-  error,
-}: {
-  personal: PersonalData | null;
-  academic: AcademicData | null;
-  attendance: AttendanceData | null;
-  gpa: string;
-  marks: MarkRow[];
-  loading: boolean;
-  error: string | null;
-}) {
-  const studentName = personal?.full_name ?? "Student";
-  const rollNumber = personal?.roll_number ?? "";
-  const programme = academic?.programme ?? "MBA";
-  const specialization = academic?.specialization ?? "";
-  const semester = academic?.current_semester ?? "";
+function StudentShell({ personal, academic, attendance, marks, loading, error, handleLogout }: any) {
+  const [activeTab, setActiveTab] = useState("Dashboard");
+  
+  const menuItems = [
+    { id: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
+    { id: "Academics", icon: <BookOpen className="h-5 w-5" /> },
+    { id: "Requests", icon: <MessageSquareWarning className="h-5 w-5" /> },
+    { id: "Calendar", icon: <CalendarDays className="h-5 w-5" /> },
+  ];
 
+  return (
+    <div className="flex w-full">
+      {/* Premium Fixed Sidebar */}
+      <aside className="fixed left-0 top-0 hidden h-screen w-64 flex-col border-r border-slate-200 bg-white shadow-sm md:flex">
+        <div className="flex h-20 items-center gap-3 px-6 border-b border-slate-100">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+            <GraduationCap className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-bold tracking-tight">ISSM Smart</p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Campus Portal</p>
+          </div>
+        </div>
+
+        <nav className="flex-1 space-y-1.5 p-4">
+          <p className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Main Menu</p>
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                activeTab === item.id 
+                  ? "bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-inset ring-indigo-100" 
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              }`}
+            >
+              {item.icon}
+              {item.id}
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-4 border-t border-slate-100">
+          <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition-all hover:bg-red-50 hover:text-red-700">
+            <LogOut className="h-5 w-5" /> Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Canvas */}
+      <main className="flex-1 md:ml-64">
+        {/* Top Header */}
+        <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-200/80 bg-white/80 px-8 backdrop-blur">
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">{activeTab}</h1>
+          <div className="flex items-center gap-4">
+            <button className="relative rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              <Bell className="h-5 w-5" />
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
+            </button>
+            <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-semibold">{personal?.full_name || "Loading..."}</p>
+                <p className="text-xs text-slate-500">{personal?.roll_number}</p>
+              </div>
+              {/* ID Card Profile Picture Placeholder */}
+              <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-indigo-100 bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                {personal?.profile_pic_url ? (
+                   <img src={personal.profile_pic_url} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                   <UserCircle className="h-6 w-6" />
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Framer Motion Tab Transitions */}
+        <div className="p-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              {activeTab === "Dashboard" && <DashboardTab personal={personal} academic={academic} attendance={attendance} error={error} loading={loading} />}
+              {activeTab === "Academics" && <AcademicsTab marks={marks} academic={academic} loading={loading} />}
+              {activeTab === "Requests" && <RequestsTab rollNumber={personal?.roll_number} />}
+              {activeTab === "Calendar" && <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">🗓️ Interactive Academic Calendar coming in Phase B...</div>}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// --- SUB-COMPONENTS FOR THE TABS ---
+
+function DashboardTab({ personal, academic, attendance, error, loading }: any) {
+  const [timeFilter, setTimeFilter] = useState("Semester");
+  
+  const present = attendance?.sessions_attended || 0;
+  const total = attendance?.total_sessions || 0;
+  const absent = Math.max(0, total - present - 2); 
+  const approvedLeaves = 2; 
+  const lateComings = 1;    
   const attendancePct = attendance?.attendance_percentage ?? 0;
-  let statusColor = "from-emerald-400 to-emerald-500";
-  let statusBg = "bg-emerald-50 border-emerald-200";
-  let statusText = "text-emerald-700";
-  let statusMessage = "You are safely above the minimum cutoff.";
 
-  if (attendancePct < 75 && attendancePct >= 65) {
-    statusColor = "from-amber-400 to-amber-500";
-    statusBg = "bg-amber-50 border-amber-200";
-    statusText = "text-amber-700";
-    statusMessage = "Warning: You are at risk. Please ensure you attend upcoming sessions.";
-  } else if (attendancePct < 65 && attendancePct > 0) {
-    statusColor = "from-red-500 to-red-600";
-    statusBg = "bg-red-50 border-red-200";
-    statusText = "text-red-700";
-    statusMessage = "Critical Shortage: You are currently ineligible for semester exams.";
-  }
+  const chartData = [
+    { name: 'Present', value: present, color: '#4f46e5' }, 
+    { name: 'Absent', value: absent, color: '#ef4444' }, 
+    { name: 'Approved Leave', value: approvedLeaves, color: '#10b981' }, 
+    { name: 'Late', value: lateComings, color: '#f59e0b' }, 
+  ];
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {loading ? "Loading profile…" : `Welcome back, ${studentName}`}
+      {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+      
+      {/* 🚀 NEW PERSONALIZED HERO BANNER */}
+      <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-8 shadow-sm">
+        <div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl"></div>
+        <div className="relative z-10">
+          <p className="text-sm font-bold uppercase tracking-widest text-indigo-400 mb-2">ISSM Business School</p>
+          <h1 className="text-3xl font-extrabold text-white sm:text-4xl">
+            Welcome Future Business Leader, <br className="hidden sm:block" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Mr. Sakthi R P</span>
           </h1>
-          <p className="text-sm text-slate-500">
-            {programme} {specialization ? `in ${specialization}` : ""}
-            {semester ? ` · Semester ${semester}` : ""}
-            {rollNumber ? ` · Roll No. ${rollNumber}` : ""}
+          <p className="mt-4 text-sm font-medium text-slate-300 max-w-xl">
+            Your centralized command center for academic analytics, daily attendance, and operational requests.
           </p>
         </div>
-        <div className="flex gap-3">
-          <StatChip icon={<LayoutDashboard className="h-4 w-4" />} label="CGPA" value={gpa} />
-          <StatChip icon={<Calendar className="h-4 w-4" />} label="Term" value="Fall 2026" />
-        </div>
-      </section>
-
-      {error ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </p>
-      ) : null}
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column: Marks & Timetable (Spans 2 columns) */}
-        <div className="lg:col-span-2 space-y-6">
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-              <div className="flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-indigo-600" />
-                <h2 className="font-semibold">Academic Performance</h2>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="px-5 py-3 font-medium">Code</th>
-                    <th className="px-5 py-3 font-medium">Subject</th>
-                    <th className="px-5 py-3 font-medium">Total</th>
-                    <th className="px-5 py-3 font-medium">Grade</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {loading ? (
-                    <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-500">Loading marks…</td></tr>
-                  ) : marks.length === 0 ? (
-                    <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-500">No marks found.</td></tr>
-                  ) : (
-                    marks.map((row, index) => (
-                      <tr key={row.id ?? index} className="hover:bg-slate-50/80">
-                        <td className="px-5 py-3 font-mono text-xs text-slate-500">{row.subject_code}</td>
-                        <td className="px-5 py-3 font-medium">{row.subject_name}</td>
-                        <td className="px-5 py-3 font-semibold">{row.total_score}</td>
-                        <td className="px-5 py-3">
-                          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${row.grade === 'O' || row.grade === 'A+' ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-sky-50 text-sky-700 ring-sky-100'}`}>
-                            {row.grade}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          {/* TIMETABLE VIEWER */}
-          <Timetable specialization={specialization} semester={semester} />
-        </div>
-
-        {/* Right Column: Attendance & Course Materials */}
-        <div className="space-y-6">
-          <section className={`rounded-2xl border p-5 shadow-sm transition-colors ${statusBg}`}>
-            <div className="mb-4 flex items-center gap-2">
-              <Users className={`h-4 w-4 ${statusText}`} />
-              <h2 className={`font-semibold ${statusText}`}>Attendance Status</h2>
-            </div>
-            <div className="mb-2 flex items-end justify-between">
-              <p className={`text-3xl font-semibold tracking-tight ${statusText}`}>{attendancePct}%</p>
-              <p className={`text-xs font-medium ${statusText}`}>Required: 75%</p>
-            </div>
-            <div className="h-3 overflow-hidden rounded-full bg-white/60">
-              <div className={`h-full rounded-full bg-gradient-to-r ${statusColor} transition-all duration-1000 ease-out`} style={{ width: `${attendancePct}%` }} />
-            </div>
-            <p className={`mt-3 text-sm font-medium ${statusText}`}>{statusMessage}</p>
-          </section>
-          
-          <CourseMaterials canUpload={false} subjectCode="MBA401"/>
-        </div>
+      </div>
+      
+      {/* Existing Analytics Filter Bar */}
+      <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+         <h2 className="text-sm font-bold text-slate-700">Attendance Analytics</h2>
+         <select 
+            value={timeFilter}
+            onChange={(e) => setTimeFilter(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all cursor-pointer"
+         >
+            <option value="Week">This Week</option>
+            <option value="Month">This Month</option>
+            <option value="Semester">Entire Semester</option>
+         </select>
       </div>
 
-      {/* NEW: Leave & Helpdesk Modules */}
-      <div className="mt-6 space-y-6">
-        <LeaveRequest rollNumber={rollNumber} />
-        <Helpdesk rollNumber={rollNumber} />
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Advanced Interactive Donut Chart */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-1 flex flex-col items-center">
+           <h3 className="text-sm font-medium text-slate-500 w-full text-left mb-4">Breakdown ({timeFilter})</h3>
+           
+           <div className="h-48 w-full relative">
+             <ResponsiveContainer width="100%" height="100%">
+               <PieChart>
+                 <Pie
+                   data={chartData}
+                   cx="50%"
+                   cy="50%"
+                   innerRadius={60}
+                   outerRadius={80}
+                   paddingAngle={4}
+                   dataKey="value"
+                   stroke="none"
+                 >
+                   {chartData.map((entry, index) => (
+                     <Cell key={`cell-${index}`} fill={entry.color} className="transition-all duration-300 hover:opacity-80 cursor-pointer" />
+                   ))}
+                 </Pie>
+                 <Tooltip 
+                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                   itemStyle={{ color: '#1e293b', fontWeight: 600 }}
+                 />
+               </PieChart>
+             </ResponsiveContainer>
+             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+               <span className="text-3xl font-bold tracking-tight text-slate-800">{attendancePct}%</span>
+             </div>
+           </div>
+           
+           <div className="mt-4 w-full grid grid-cols-2 gap-3 text-xs font-semibold text-slate-600">
+             {chartData.map(item => (
+                <div key={item.name} className="flex items-center gap-2">
+                   <span className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: item.color }}></span>
+                   <span className="text-slate-900">{item.name}: {item.value}</span>
+                </div>
+             ))}
+           </div>
+        </div>
+
+        {/* Live Campus Action Center */}
+        <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-sm flex flex-col relative overflow-hidden">
+           <div className="absolute top-0 right-0 -mr-16 -mt-16 h-48 w-48 rounded-full bg-indigo-500/10 blur-3xl"></div>
+           
+           <h3 className="flex items-center gap-2 text-sm font-medium text-indigo-300 mb-6 relative z-10">
+              <Bell className="h-4 w-4"/> Campus Action Center
+           </h3>
+           
+           <div className="space-y-4 flex-1 overflow-y-auto relative z-10 pr-2">
+             <div className="group rounded-xl bg-white/5 p-4 backdrop-blur-md border border-white/10 transition-all hover:bg-white/10 hover:border-white/20">
+               <div className="flex justify-between items-start mb-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">Request Approved</p>
+                  <span className="text-[10px] text-slate-400">2 hours ago</span>
+               </div>
+               <p className="text-sm font-medium text-slate-200">Your On-Duty (OD) request for the Corporate Tax Seminar has been approved.</p>
+             </div>
+             
+             <div className="group rounded-xl bg-white/5 p-4 backdrop-blur-md border border-white/10 transition-all hover:bg-white/10 hover:border-white/20">
+               <div className="flex justify-between items-start mb-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-indigo-400">New Announcement</p>
+                  <span className="text-[10px] text-slate-400">Yesterday</span>
+               </div>
+               <p className="text-sm font-medium text-slate-200">GST Regulations & Indian Stock Market workshop scheduled for tomorrow at 10 AM in the main auditorium.</p>
+             </div>
+           </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function StatChip({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+function AcademicsTab({ marks, academic, loading }: any) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-      <p className="inline-flex items-center gap-1 text-[11px] uppercase tracking-wide text-slate-500">
-        {icon}
-        {label}
-      </p>
-      <p className="text-sm font-semibold">{value}</p>
+    <div className="grid gap-6 lg:grid-cols-3">
+      {/* 1. Grade History */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm overflow-hidden lg:col-span-1">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><ClipboardList className="h-5 w-5 text-indigo-600"/> Grade History</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-2 font-medium">Subject</th>
+                <th className="px-4 py-2 font-medium">Total</th>
+                <th className="px-4 py-2 font-medium">Grade</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? <tr><td colSpan={3} className="py-4 text-center">Loading...</td></tr> : 
+                marks.map((row: any) => (
+                  <tr key={row.id}>
+                    <td className="px-4 py-3 font-medium">{row.subject_name}</td>
+                    <td className="px-4 py-3 font-semibold">{row.total_score}</td>
+                    <td className="px-4 py-3"><span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">{row.grade}</span></td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 2. Timetable */}
+      <div className="lg:col-span-1 h-full">
+        <Timetable specialization={academic?.specialization} semester={academic?.current_semester} />
+      </div>
+
+      {/* 3. Course Materials */}
+      <div className="lg:col-span-1 h-full">
+        <CourseMaterials subjectCode="MBA-401" canUpload={false} />
+      </div>
+    </div>
+  );
+}
+
+function RequestsTab({ rollNumber }: { rollNumber: string }) {
+  if (!rollNumber) return <p>Loading...</p>;
+  return (
+    <div className="space-y-8">
+      <LeaveRequest rollNumber={rollNumber} />
+      <Helpdesk rollNumber={rollNumber} />
     </div>
   );
 }
