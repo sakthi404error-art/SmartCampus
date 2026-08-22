@@ -43,8 +43,8 @@ export default function Login() {
         <div className="absolute -bottom-1/4 -right-1/4 h-3/4 w-3/4 rounded-full bg-blue-600/20 blur-[120px]"></div>
 
         <div className="relative z-10 flex items-center gap-3 text-white">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 shadow-lg">
-            <GraduationCap className="h-6 w-6 text-white" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white p-2 shadow-lg">
+            <img src="/issm-logo.png" alt="ISSM Logo" className="h-full w-full object-contain" />
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">ISSM Smart</h1>
@@ -78,8 +78,8 @@ export default function Login() {
         <div className="mx-auto w-full max-w-sm">
           {/* Mobile Logo (Only shows on small screens) */}
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600">
-              <GraduationCap className="h-5 w-5 text-white" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1.5 shadow-sm border border-slate-200">
+              <img src="/issm-logo.png" alt="ISSM Logo" className="h-full w-full object-contain" />
             </div>
             <h1 className="text-xl font-bold text-slate-900">ISSM Smart</h1>
           </div>

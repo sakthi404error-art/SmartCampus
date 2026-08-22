@@ -127,8 +127,8 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
       {/* Premium Fixed Sidebar */}
       <aside className="fixed left-0 top-0 hidden h-screen w-64 flex-col border-r border-slate-200 bg-white shadow-sm md:flex">
         <div className="flex h-20 items-center gap-3 px-6 border-b border-slate-100">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
-            <GraduationCap className="h-5 w-5" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1.5 shadow-sm border border-slate-200">
+            <img src="/issm-logo.png" alt="ISSM Logo" className="h-full w-full object-contain" />
           </div>
           <div>
             <p className="text-sm font-bold tracking-tight">ISSM Smart</p>
