@@ -10,8 +10,10 @@ export default function AdminLeaveQueue() {
 
   const fetchRequests = async () => {
     setLoading(true);
-    // Fetch requests and join with personal_data to get student names
-    const { data } = await supabase.from("leave_requests").select("*, personal_data(full_name)").order("created_at", { ascending: false });
+    // 🚀 FIX: Removed the complex join that crashes without Foreign Keys
+    const { data, error } = await supabase.from("leave_requests").select("*").order("created_at", { ascending: false });
+    
+    if (error) alert("Admin DB Error: " + error.message);
     if (data) setRequests(data);
     setLoading(false);
   };
@@ -31,12 +33,12 @@ export default function AdminLeaveQueue() {
       <div className="flex-1 overflow-y-auto p-2">
         <table className="min-w-full text-left text-sm">
           <thead className="sticky top-0 bg-white text-xs uppercase text-slate-500 shadow-sm z-10">
-            <tr><th className="px-4 py-3 font-medium">Student</th><th className="px-4 py-3 font-medium">Dates</th><th className="px-4 py-3 font-medium">Reason</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 font-medium text-right">Actions</th></tr>
+            <tr><th className="px-4 py-3 font-medium">Student Roll No</th><th className="px-4 py-3 font-medium">Dates</th><th className="px-4 py-3 font-medium">Reason</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 font-medium text-right">Actions</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {requests.map((req) => (
               <tr key={req.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3"><p className="font-bold text-slate-900">{req.personal_data?.full_name}</p><p className="text-xs text-slate-500">{req.roll_number}</p></td>
+                <td className="px-4 py-3"><p className="font-bold text-slate-900">{req.roll_number}</p></td>
                 <td className="px-4 py-3 text-slate-600 text-xs">{req.start_date} <br/>to {req.end_date}</td>
                 <td className="px-4 py-3 text-slate-600 max-w-xs truncate">{req.reason}</td>
                 <td className="px-4 py-3"><span className={`text-xs font-bold px-2 py-1 rounded-md ${req.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : req.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{req.status}</span></td>
