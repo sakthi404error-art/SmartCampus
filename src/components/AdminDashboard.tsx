@@ -2,302 +2,106 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { Search, User, FileEdit, AlertCircle, UploadCloud, CheckCircle2, Loader2, Database, XCircle, CalendarClock, Briefcase, MessageSquareWarning, Filter, Clock, CheckCircle } from "lucide-react";
-import Papa from "papaparse";
-import ProfileUploader from "./ProfileUploader";
-import BulkStudentUploader from "./BulkStudentUploader";
-import AdminLeaveQueue from "./AdminLeaveQueue";
+import { Users, FileText, Download, Search, X, Loader2, BarChart3, Database } from "lucide-react";
+import AdminProjects from "@/components/AdminProjects";
 
 export default function AdminDashboard() {
-  // Search State
-  const [searchTerm, setSearchTerm] = useState("");
-  const [student, setStudent] = useState<any>(null);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-
-  // Upload State
-  const [uploading, setUploading] = useState(false);
-  const [uploadTable, setUploadTable] = useState("attendance_data");
-  const [uploadMessage, setUploadMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
-
-  // Leave Approvals State
-  const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-
-  // Helpdesk Tickets State
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [ticketStatusFilter, setTicketStatusFilter] = useState("All");
-  const [ticketCategoryFilter, setTicketCategoryFilter] = useState("All");
+  const [activeTab, setActiveTab] = useState("Directory");
+  const [students, setStudents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
 
   useEffect(() => {
-    fetchPendingLeaves();
-    fetchTickets();
+    async function fetchStudents() {
+      setLoading(true);
+      const { data } = await supabase.from("personal_data").select("*, academic_data(programme, specialization)");
+      if (data) setStudents(data);
+      setLoading(false);
+    }
+    fetchStudents();
   }, []);
 
-  const fetchPendingLeaves = async () => {
-    const { data } = await supabase
-      .from("leave_requests")
-      .select("*, personal_data(full_name)")
-      .eq("status", "Pending")
-      .order("submitted_at", { ascending: true });
-    if (data) setPendingLeaves(data);
-  };
+  const filteredStudents = students.filter(s => 
+    s.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    s.roll_number?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const fetchTickets = async () => {
-    const { data } = await supabase
-      .from("helpdesk_tickets")
-      .select("*, personal_data(full_name)")
-      .order("submitted_at", { ascending: false });
-    if (data) setTickets(data);
-  };
-
-  const handleLeaveAction = async (id: string, newStatus: 'Approved' | 'Rejected') => {
-    setProcessingId(id);
-    const { error } = await supabase.from("leave_requests").update({ status: newStatus }).eq("id", id);
-    setProcessingId(null);
-    if (!error) fetchPendingLeaves();
-  };
-
-  const handleTicketAction = async (id: string, newStatus: 'In Review' | 'Resolved') => {
-    setProcessingId(id);
-    const { error } = await supabase.from("helpdesk_tickets").update({ status: newStatus }).eq("id", id);
-    setProcessingId(null);
-    if (!error) fetchTickets();
-  };
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchTerm.trim()) return;
-    setSearchLoading(true);
-    setSearchError(null);
-    setStudent(null);
-    try {
-      const { data: personalData, error: personalError } = await supabase.from("personal_data").select("*");
-      if (personalError) throw personalError;
-      const foundStudent = personalData?.find((s) => JSON.stringify(s).toLowerCase().includes(searchTerm.toLowerCase()));
-      if (!foundStudent) {
-        setSearchError("No student found with that name or Roll Number.");
-      } else {
-        const { data: acadData } = await supabase.from("academic_data").select("*").eq("roll_number", foundStudent.roll_number).maybeSingle();
-        setStudent({ ...foundStudent, ...acadData });
-      }
-    } catch (err) {
-      setSearchError("Failed to connect to the database.");
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
-  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setUploadMessage(null);
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          const rows = results.data as any[];
-          const { error } = await supabase.from(uploadTable).upsert(rows);
-          if (error) throw error;
-          setUploadMessage({ text: `Successfully synced ${rows.length} records!`, type: "success" });
-        } catch (err: any) {
-          setUploadMessage({ text: `Upload failed: ${err.message}`, type: "error" });
-        } finally {
-          setUploading(false);
-          e.target.value = ""; 
-        }
-      }
-    });
-  };
-
-  // Slicer Logic for Tickets
-  const filteredTickets = tickets.filter(t => {
-    const matchesStatus = ticketStatusFilter === "All" || t.status === ticketStatusFilter;
-    const matchesCategory = ticketCategoryFilter === "All" || t.category === ticketCategoryFilter;
-    return matchesStatus && matchesCategory;
-  });
+  if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
 
   return (
     <div className="space-y-6">
-      {/* 1. LEAVE & OD APPROVALS */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-4">
-          <div>
-            <p className="text-sm font-medium text-indigo-600">Action Required</p>
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-900">
-              <CalendarClock className="h-5 w-5 text-indigo-600" />
-              Pending Leaves & ODs
-            </h2>
-          </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-700">
-            {pendingLeaves.length}
-          </div>
-        </div>
+      {/* Admin Navigation Tabs */}
+      <div className="flex gap-4 border-b border-slate-200 pb-4">
+        <button onClick={() => setActiveTab("Directory")} className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${activeTab === "Directory" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"}`}><Users className="h-4 w-4"/> Student Directory</button>
+        <button onClick={() => setActiveTab("Projects")} className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${activeTab === "Projects" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"}`}><Database className="h-4 w-4"/> Projects & Downloads</button>
+      </div>
 
-        <div className="space-y-4">
-          {pendingLeaves.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 py-8 text-center text-sm text-slate-500">
-              All caught up! No pending requests.
+      {activeTab === "Projects" && <AdminProjects />}
+
+      {activeTab === "Directory" && (
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[700px]">
+          <div className="border-b border-slate-100 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="text-lg font-bold text-slate-900">Master Student Directory</h2>
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input type="text" placeholder="Search roll no or name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-4 text-sm outline-none focus:border-indigo-600"/>
             </div>
-          ) : (
-            pendingLeaves.map((req) => (
-              <div key={req.id} className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-900">{req.personal_data?.full_name || req.roll_number}</span>
-                    <span className="text-xs font-medium text-slate-500">({req.roll_number})</span>
-                  </div>
-                  <p className="mt-1 text-sm text-slate-700"><span className="font-medium text-indigo-600">{req.request_type}</span> on {new Date(req.target_date).toLocaleDateString()}</p>
-                  <p className="mt-1 text-xs text-slate-500">"{req.reason}"</p>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <button onClick={() => handleLeaveAction(req.id, 'Rejected')} className="rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100">Reject</button>
-                  <button onClick={() => handleLeaveAction(req.id, 'Approved')} className="rounded-lg bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100">Approve</button>
-                </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            <table className="min-w-full text-left text-sm">
+              <thead className="sticky top-0 bg-white text-xs uppercase text-slate-500 shadow-sm z-10">
+                <tr><th className="px-4 py-3 font-medium">Name</th><th className="px-4 py-3 font-medium">Roll No</th><th className="px-4 py-3 font-medium">Specialization</th><th className="px-4 py-3 font-medium text-right">Action</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredStudents.map((student: any) => (
+                  <tr key={student.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-900">{student.full_name}</td>
+                    <td className="px-4 py-3 text-slate-500">{student.roll_number}</td>
+                    <td className="px-4 py-3 text-slate-600">{student.academic_data?.[0]?.specialization || "N/A"}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button onClick={() => setSelectedStudent(student)} className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">Full Profile</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Student Full Profile Modal */}
+      {selectedStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" onClick={() => setSelectedStudent(null)}>
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-slate-900 to-indigo-900 p-6 text-white relative flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">{selectedStudent.full_name}</h2>
+                <p className="text-indigo-200 text-sm mt-1">{selectedStudent.roll_number} | {selectedStudent.email}</p>
               </div>
-            ))
-          )}
-        </div>
-      </section>
-
-      {/* 2. HELPDESK TICKETS & SLICERS */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-6 flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-indigo-600">Issue Management</p>
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-900">
-              <MessageSquareWarning className="h-5 w-5 text-indigo-600" />
-              Helpdesk Overview
-            </h2>
-          </div>
-          
-          {/* Slicers / Filters */}
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-slate-400" />
-            <select 
-              value={ticketStatusFilter} 
-              onChange={(e) => setTicketStatusFilter(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium outline-none"
-            >
-              <option value="All">All Statuses</option>
-              <option value="Pending">Pending</option>
-              <option value="In Review">In Review</option>
-              <option value="Resolved">Resolved</option>
-            </select>
-            <select 
-              value={ticketCategoryFilter} 
-              onChange={(e) => setTicketCategoryFilter(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium outline-none"
-            >
-              <option value="All">All Categories</option>
-              <option value="Complaint">Complaints</option>
-              <option value="Query">Queries</option>
-              <option value="Feedback">Feedback</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {filteredTickets.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 py-8 text-center text-sm text-slate-500">
-              No tickets match your filters.
+              <button onClick={() => setSelectedStudent(null)} className="text-white/70 hover:text-white"><X className="h-6 w-6"/></button>
             </div>
-          ) : (
-            filteredTickets.map((ticket) => (
-              <div key={ticket.id} className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-200 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-900">{ticket.personal_data?.full_name || ticket.roll_number}</span>
-                    <span className="text-xs text-slate-500">• {new Date(ticket.submitted_at).toLocaleString()}</span>
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                      ticket.category === 'Complaint' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                    }`}>
-                      {ticket.category}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-700">{ticket.description}</p>
-                </div>
-                
-                <div className="flex shrink-0 flex-col gap-2 border-t border-slate-100 pt-4 sm:border-0 sm:pt-0">
-                  <span className={`inline-flex items-center justify-center rounded-lg px-3 py-1 text-xs font-semibold ${
-                    ticket.status === 'Resolved' ? 'bg-emerald-100 text-emerald-700' :
-                    ticket.status === 'In Review' ? 'bg-indigo-100 text-indigo-700' :
-                    'bg-amber-100 text-amber-700'
-                  }`}>
-                    {ticket.status}
-                  </span>
-                  
-                  {/* Action Buttons */}
-                  {ticket.status === 'Pending' && (
-                    <button onClick={() => handleTicketAction(ticket.id, 'In Review')} className="flex items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100">
-                      <Clock className="h-3 w-3" /> Mark 'In Review'
-                    </button>
-                  )}
-                  {ticket.status === 'In Review' && (
-                    <button onClick={() => handleTicketAction(ticket.id, 'Resolved')} className="flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100">
-                      <CheckCircle className="h-3 w-3" /> Mark 'Resolved'
-                    </button>
-                  )}
-                </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-xl bg-white p-4 border border-slate-200"><p className="text-xs text-slate-500">Phone</p><p className="font-semibold text-slate-800">{selectedStudent.phone || "N/A"}</p></div>
+                <div className="rounded-xl bg-white p-4 border border-slate-200"><p className="text-xs text-slate-500">City</p><p className="font-semibold text-slate-800">{selectedStudent.city || "N/A"}</p></div>
+                <div className="rounded-xl bg-white p-4 border border-slate-200"><p className="text-xs text-slate-500">Programme</p><p className="font-semibold text-slate-800">{selectedStudent.academic_data?.[0]?.programme || "N/A"}</p></div>
+                <div className="rounded-xl bg-white p-4 border border-slate-200"><p className="text-xs text-slate-500">Mentor Email</p><p className="font-semibold text-slate-800">{selectedStudent.mentor_email || "Not Assigned"}</p></div>
               </div>
-            ))
-          )}
-        </div>
-      </section>
 
-      {/* 3. STUDENT INSPECTOR (Search Bar remains unchanged) */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-         <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-4">
-          <div>
-            <p className="text-sm font-medium text-indigo-600">Database Search</p>
-            <h2 className="text-xl font-semibold">Student Inspector</h2>
-          </div>
-        </div>
-        <form onSubmit={handleSearch} className="mb-6 flex gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input type="text" placeholder="Search by student name or roll number..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-sm outline-none focus:border-indigo-600 focus:bg-white" />
-          </div>
-          <button type="submit" disabled={searchLoading} className="rounded-xl bg-indigo-600 px-6 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50">Search</button>
-        </form>
-        {student && (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-6 sm:flex sm:items-center sm:justify-between">
-            <div className="sm:flex sm:gap-5">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600"><User className="h-8 w-8" /></div>
-              <div className="mt-4 sm:mt-0 sm:pt-1">
-                <p className="text-xl font-bold text-slate-900">{student.full_name}</p>
-                <p className="text-sm font-medium text-slate-500">{student.programme} · Roll No: {student.roll_number}</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-6">
+                <h3 className="text-sm font-bold text-slate-900 mb-4 border-b pb-2">Uploaded Resumes</h3>
+                <div className="flex gap-4">
+                   {/* Conceptual buttons for Admin view */}
+                   <button className="flex items-center gap-2 rounded-lg bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 border border-indigo-200"><Download className="h-4 w-4"/> Specialization Resume</button>
+                   <button className="flex items-center gap-2 rounded-lg bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 border border-indigo-200"><Download className="h-4 w-4"/> Management Resume</button>
+                </div>
               </div>
             </div>
           </div>
-        )}
-      </section>
-      <ProfileUploader/>
-      <BulkStudentUploader/>
-      <AdminLeaveQueue/>
-      {/* 4. BULK UPLOAD SECTION (Remains unchanged) */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold tracking-tight">Bulk Data Migration</h2>
         </div>
-        <div className="mb-6">
-          <select value={uploadTable} onChange={(e) => setUploadTable(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-indigo-600">
-            <option value="attendance_data">Attendance Data (Updates Daily)</option>
-            <option value="marks_data">Marks Data (Updates Semesterly)</option>
-            <option value="academic_data">Academic Data</option>
-            <option value="personal_data">Personal Data (Master Roster)</option>
-            <option value="timetables">Timetables (Class Schedule)</option>
-          </select>
-        </div>
-        <div className="relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center transition hover:border-indigo-400 hover:bg-indigo-50/50">
-          <UploadCloud className="mb-3 h-8 w-8 text-indigo-500" />
-          <p className="mb-1 text-sm font-medium text-slate-700">Click to upload CSV file</p>
-          <input type="file" accept=".csv" onChange={handleCSVUpload} disabled={uploading} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
-          <button className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200">{uploading ? "Processing..." : "Select File"}</button>
-        </div>
-      </section>
+      )}
     </div>
   );
 }

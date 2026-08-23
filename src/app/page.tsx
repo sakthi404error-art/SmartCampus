@@ -192,18 +192,37 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
         <AnimatePresence>
           {isProfileModalOpen && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => setIsProfileModalOpen(false)}>
-              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                <div className="bg-indigo-600 p-6 flex flex-col items-center text-white relative">
+              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                <div className="bg-indigo-600 p-6 flex flex-col items-center text-white relative flex-shrink-0">
                   <button onClick={() => setIsProfileModalOpen(false)} className="absolute top-4 right-4 text-white/70 hover:text-white"><X className="h-5 w-5"/></button>
                   <div className="h-24 w-24 rounded-full border-4 border-white/20 overflow-hidden bg-white/10 mb-4 flex items-center justify-center">{personal?.profile_pic_url ? <img src={personal.profile_pic_url} className="h-full w-full object-cover"/> : <UserCircle className="h-12 w-12"/>}</div>
                   <h2 className="text-xl font-bold">{personal?.full_name}</h2><p className="text-indigo-200 text-sm">{personal?.roll_number}</p>
                 </div>
-                <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="p-6 overflow-y-auto space-y-6">
+                  <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <div><p className="text-slate-500 text-xs">Email</p><p className="font-medium text-slate-800 break-all">{personal?.email}</p></div>
                     <div><p className="text-slate-500 text-xs">Phone</p><p className="font-medium text-slate-800">{personal?.phone || "N/A"}</p></div>
                     <div><p className="text-slate-500 text-xs">Programme</p><p className="font-medium text-slate-800">{academic?.programme}</p></div>
                     <div><p className="text-slate-500 text-xs">Specialization</p><p className="font-medium text-slate-800">{academic?.specialization}</p></div>
+                  </div>
+                  
+                  {/* 🚀 NEW RESUME UPLOAD PROVISION */}
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 border-b border-slate-200 pb-2 mb-3">Document Vault</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
+                        <span className="text-xs font-semibold text-slate-700">Specialization Resume</span>
+                        <label className="cursor-pointer bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-indigo-100 transition-colors">
+                          Upload File <input type="file" className="hidden" accept=".pdf,.docx"/>
+                        </label>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
+                        <span className="text-xs font-semibold text-slate-700">Management Resume</span>
+                        <label className="cursor-pointer bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-indigo-100 transition-colors">
+                          Upload File <input type="file" className="hidden" accept=".pdf,.docx"/>
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -251,6 +270,34 @@ function DashboardTab({ personal, attendance }: any) {
         <div className="relative z-10">
           <p className="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-2">ISSM Business School</p>
           <h1 className="text-2xl font-extrabold text-white md:text-4xl">Welcome, <br className="hidden sm:block" /><span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">{personal?.full_name}</span></h1>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Analytics Snapshot */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-sm font-bold text-slate-700 mb-4">Quick Attendance Status</h2>
+          <div className="flex items-center gap-4">
+             <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-indigo-100 text-lg font-bold text-indigo-600">{attendancePct}%</div>
+             <div>
+               <p className="text-sm font-medium text-slate-500">You are currently maintaining good academic standing. Keep it up!</p>
+             </div>
+          </div>
+        </div>
+
+        {/* 🚀 NEW: Announcements Feed */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col h-full">
+          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-4 border-b border-slate-100 pb-2"><Bell className="h-4 w-4 text-amber-500"/> Campus Announcements</h2>
+          <div className="space-y-3 flex-1 overflow-y-auto">
+             <div className="rounded-lg bg-indigo-50 p-3 border border-indigo-100">
+               <p className="text-xs font-bold text-indigo-700 mb-1">Placement Drive Update</p>
+               <p className="text-xs text-slate-600">Ensure both your Specialization and Management resumes are uploaded in your profile by Friday.</p>
+             </div>
+             <div className="rounded-lg bg-slate-50 p-3 border border-slate-100">
+               <p className="text-xs font-bold text-slate-700 mb-1">Semester Projects</p>
+               <p className="text-xs text-slate-500">Check the Projects tab. Deadlines are strictly enforced via the system clock.</p>
+             </div>
+          </div>
         </div>
       </div>
     </div>
