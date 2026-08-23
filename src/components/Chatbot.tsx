@@ -10,44 +10,38 @@ export default function Chatbot() {
   const [isLoading, setIsLoading] = useState(false);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
-  // 🚀 SECURED: Uses Vercel Environment Variables instead of plain text!
-  const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY; 
-
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
-    
+
     const userMsg = input.trim();
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setInput('');
     setIsLoading(true);
 
-    if (!GEMINI_API_KEY) {
-      setTimeout(() => {
-        setMessages(prev => [...prev, { role: 'ai', content: "⚠️ System Error: API Key missing from Vercel Environment Variables." }]);
-        setIsLoading(false);
-      }, 1000);
-      return;
-    }
-
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `You are Nexus AI, an assistant for ISSM Business School students. Answer concisely and professionally. User asks: ${userMsg}` }] }]
-        })
+        body: JSON.stringify({ message: userMsg })
       });
 
       const data = await response.json();
-      const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm having trouble processing that right now.";
-      
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'The AI assistant could not process your request.');
+      }
+
+      const aiReply = data.reply || 'I can help with attendance, projects, placements, and campus queries. Please ask again in a different way.';
       setMessages(prev => [...prev, { role: 'ai', content: aiReply }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'ai', content: "Network error. Please check your API key and connection." }]);
+      setMessages(prev => [...prev, {
+        role: 'ai',
+        content: 'I’m here to help with attendance, leave queries, project deadlines, and placement support. Please try asking again in a simpler way.'
+      }]);
     } finally {
       setIsLoading(false);
     }

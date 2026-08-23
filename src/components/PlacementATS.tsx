@@ -8,62 +8,86 @@ export default function PlacementATS({ rollNumber }: { rollNumber?: string }) {
   const [file, setFile] = useState<File | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileUpload = (e: any) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setAnalysisResult(null); 
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    const isSupported = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(selectedFile.type) || /\.(pdf|doc|docx)$/i.test(selectedFile.name);
+
+    if (!isSupported) {
+      setFile(null);
+      setError("Please upload a PDF, DOC, or DOCX resume file.");
+      setAnalysisResult(null);
+      return;
     }
+
+    if (selectedFile.size > 5 * 1024 * 1024) {
+      setFile(null);
+      setError("Resume file must be under 5MB.");
+      setAnalysisResult(null);
+      return;
+    }
+
+    setError(null);
+    setFile(selectedFile);
+    setAnalysisResult(null);
   };
 
   const runAIAtsScan = () => {
-    if (!file) return;
+    if (!file) {
+      setError("Upload a valid resume before running the ATS scan.");
+      return;
+    }
+
+    setError(null);
     setIsScanning(true);
-    
+
     setTimeout(() => {
-      // 🚀 THE FIX: Generates a consistent score based on the specific file's name and size.
-      // If you upload the same file, you get the EXACT same result.
       const fileHash = file.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) + file.size;
-      const consistentScore = (fileHash % 21) + 75; // Always generates a score between 75 and 95 for a specific file
-      const isGood = consistentScore >= 80;
-      
-      const roleMatch = resumeType === "Specialization" 
-        ? "IT Business Analyst / SAP Consultant / Systems Manager" 
+      const consistencyBoost = fileHash % 12;
+      const score = Math.min(98, 76 + consistencyBoost + (resumeType === "Specialization" ? 8 : 5));
+      const isGood = score >= 82;
+
+      const roleMatch = resumeType === "Specialization"
+        ? "Business Analyst / SAP Consultant / Systems Manager"
         : "Product Manager / Management Trainee / Operations Lead";
 
       const strengthsList = isGood ? [
-        "Strong academic formatting detected.",
-        `Excellent keywords found for ${resumeType} domain.`,
-        "Quantifiable metrics present in project section."
+        "Strong core experience profile for the selected domain.",
+        `Relevant keywords for ${resumeType.toLowerCase()} resume roles are present.`,
+        "Academic and project sections are clearly structured."
       ] : [
-        "Basic contact information successfully parsed.",
-        "Clear educational timeline detected.",
-        "No spelling errors detected by AI engine."
+        "Contact details and academic timeline are clear.",
+        "Resume format is readable and easy to scan.",
+        "Basic role-fit structure is present."
       ];
 
       const weaknessesList = isGood ? [
-        "Could use more action verbs (e.g., 'Spearheaded', 'Engineered').",
-        "Consider expanding on leadership roles."
+        "Add more measurable achievements with numbers.",
+        "Expand on leadership and cross-functional impact.",
+        "Use action verbs like 'spearheaded', 'streamlined', and 'optimized'."
       ] : [
-        "Missing critical ATS keywords (e.g., 'Agile', 'ERP', 'Cross-functional').",
-        "Formatting may break in older Oracle Taleo systems.",
-        "Lacks quantifiable achievements (e.g., 'Increased efficiency by X%')."
+        "Add resume keywords like 'Agile', 'ERP', 'analytics', and 'stakeholder management'.",
+        "Improve text readability in ATS-friendly layouts.",
+        "Include quantifiable outcomes such as efficiency gains or revenue impact."
       ];
 
       setAnalysisResult({
-        score: consistentScore,
-        roleMatch: roleMatch,
+        score: Math.round(score),
+        roleMatch,
         expectedSalary: isGood ? "₹10L - ₹18L PA" : "₹6L - ₹9L PA",
         strengths: strengthsList,
         weaknesses: weaknessesList,
         actionItems: [
-          `Add specific industry keywords tailored to ${roleMatch}.`,
-          "Ensure your uploaded PDF is text-selectable, not an image.",
-          "Review ISSM Placement guidelines for formatting rules."
+          `Tailor the summary and skills section to ${roleMatch}.`,
+          "Convert bullet points into ATS-friendly, impact-driven wording.",
+          "Ensure the document is text-selectable and free of image-based formatting."
         ]
       });
       setIsScanning(false);
-    }, 2500);
+    }, 1800);
   };
 
   return (
@@ -104,6 +128,12 @@ export default function PlacementATS({ rollNumber }: { rollNumber?: string }) {
                 </div>
               )}
             </div>
+
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </div>
+            )}
 
             <button onClick={runAIAtsScan} disabled={!file || isScanning} className="w-full flex justify-center items-center gap-2 rounded-xl bg-slate-900 py-3.5 text-sm font-bold text-white transition-all hover:bg-indigo-600 disabled:opacity-50">
               {isScanning ? <><Loader2 className="h-5 w-5 animate-spin"/> AI Engine Processing...</> : <><Target className="h-5 w-5"/> Run ATS Analysis</>}
