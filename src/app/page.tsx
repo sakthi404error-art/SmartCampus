@@ -17,6 +17,7 @@ import LeaveRequest from "@/components/LeaveRequest";
 import Helpdesk from "@/components/Helpdesk";
 import Timetable from "@/components/Timetable";
 import CourseMaterials from "@/components/CourseMaterials";
+import MentorDashboard from "@/components/MentorDashboard"; // 🚀 NEW MENTOR DASHBOARD IMPORT
 
 type PersonalData = { roll_number: string; full_name: string; email: string; city: string; profile_pic_url?: string; phone?: string; dob?: string };
 type AcademicData = { programme: string; specialization: string; current_semester: string; section: string; };
@@ -24,6 +25,8 @@ type AttendanceData = { total_sessions: number; sessions_attended: number; atten
 type MarkRow = { id: string; subject_code: string; subject_name: string; internals: number; midterm: number; endterm: number; total_score: number; grade: string; };
 
 const ADMIN_EMAILS = ["sakthirp.official@gmail.com"];
+// 🚀 ADD YOUR 10 PROFESSORS' EMAILS HERE:
+const MENTOR_EMAILS = ["pullingo2k20@gmail.com"]; 
 
 export default function Home() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -41,15 +44,25 @@ export default function Home() {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email) {
-        setUserEmail(session.user.email);
-        setRole(ADMIN_EMAILS.includes(session.user.email.toLowerCase()) ? "Admin" : "Student");
+        const email = session.user.email.toLowerCase();
+        setUserEmail(email);
+        
+        // 🚀 NEW ROLE ROUTING LOGIC
+        if (ADMIN_EMAILS.includes(email)) {
+          setRole("Admin");
+        } else if (MENTOR_EMAILS.includes(email)) {
+          setRole("Mentor");
+        } else {
+          setRole("Student");
+        }
       }
     };
     checkUser();
   }, []);
 
   useEffect(() => {
-    if (!userEmail || role === "Admin") return;
+    // 🚀 Mentors and Admins bypass the student data fetch entirely
+    if (!userEmail || role === "Admin" || role === "Mentor") return;
     let cancelled = false;
 
     async function loadDashboard() {
@@ -128,17 +141,31 @@ export default function Home() {
           </div>
           <AdminDashboard />
         </div>
+      ) : role === "Mentor" ? (
+        // 🚀 NEW MENTOR VIEW
+        <div className="w-full max-w-7xl mx-auto py-8 px-4 sm:px-6">
+          <div className="mb-6 flex items-center justify-between">
+            <h1 className="text-2xl font-bold flex items-center gap-2 text-slate-900">
+              <Users className="h-6 w-6 text-indigo-600"/> Mentor Command Center
+            </h1>
+            <button onClick={handleLogout} className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium border border-slate-200 text-slate-700 shadow-sm hover:bg-slate-50">
+              <LogOut className="h-4 w-4" /> Sign Out
+            </button>
+          </div>
+          <MentorDashboard mentorEmail={userEmail} />
+        </div>
       ) : (
         <StudentShell 
           personal={personal} academic={academic} attendance={attendance} 
           marks={marks} loading={loading} error={error} handleLogout={handleLogout} 
         />
       )}
-      {/* Keeping Chatbot active, we will debug Nexus AI backend connection in a later sprint */}
       {role === "Student" && <Chatbot />}
     </div>
   );
 }
+
+// ... [KEEP YOUR EXISTING StudentShell, DashboardTab, AcademicsTab, and RequestsTab CODE EXACTLY THE SAME BELOW THIS LINE] ...
 
 function StudentShell({ personal, academic, attendance, marks, loading, error, handleLogout }: any) {
   const [activeTab, setActiveTab] = useState("Dashboard");
@@ -289,14 +316,11 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
   );
 }
 
-// --- SUB-COMPONENTS ---
-
 function DashboardTab({ personal, academic, attendance, error }: any) {
   const [timeFilter, setTimeFilter] = useState("Semester");
   const [chartData, setChartData] = useState<any[]>([]);
   const [attendancePct, setAttendancePct] = useState(0);
 
-  // Dynamic filter logic
   useEffect(() => {
     const basePresent = attendance?.sessions_attended || 0;
     const baseTotal = attendance?.total_sessions || 0;
@@ -314,7 +338,6 @@ function DashboardTab({ personal, academic, attendance, error }: any) {
       ]);
       setAttendancePct(90);
     } else {
-      // Entire Semester (Raw DB Data)
       setChartData([
         { name: 'Present', value: basePresent, color: '#4f46e5' }, { name: 'Absent', value: baseAbsent, color: '#ef4444' }, { name: 'Approved Leave', value: 2, color: '#10b981' }, { name: 'Late', value: 1, color: '#f59e0b' },
       ]);
