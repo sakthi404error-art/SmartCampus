@@ -18,6 +18,8 @@ import Helpdesk from "@/components/Helpdesk";
 import Timetable from "@/components/Timetable";
 import CourseMaterials from "@/components/CourseMaterials";
 import MentorDashboard from "@/components/MentorDashboard"; // 🚀 NEW MENTOR DASHBOARD IMPORT
+import Projects from "@/components/Projects";
+import { FolderUp } from "lucide-react"; // <-- Add FolderUp to your existing lucide-react import
 
 type PersonalData = { roll_number: string; full_name: string; email: string; city: string; profile_pic_url?: string; phone?: string; dob?: string };
 type AcademicData = { programme: string; specialization: string; current_semester: string; section: string; };
@@ -175,6 +177,7 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
   const menuItems = [
     { id: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
     { id: "Academics", icon: <BookOpen className="h-5 w-5" /> },
+    { id: "Projects", icon: <FolderUp className="h-5 w-5" /> }, // 🚀 NEW TAB ADDED
     { id: "Requests", icon: <MessageSquareWarning className="h-5 w-5" /> },
     { id: "Calendar", icon: <CalendarDays className="h-5 w-5" /> },
   ];
@@ -300,12 +303,16 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
         {/* Tab Transitions */}
         <div className="p-4 md:p-8 overflow-x-hidden">
           <AnimatePresence mode="wait">
-            <motion.div
+          <motion.div
               key={activeTab}
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}
             >
               {activeTab === "Dashboard" && <DashboardTab personal={personal} academic={academic} attendance={attendance} error={error} />}
               {activeTab === "Academics" && <AcademicsTab marks={marks} academic={academic} loading={loading} />}
+              
+              {/* 🚀 NEW PROJECTS TAB RENDERER */}
+              {activeTab === "Projects" && <Projects rollNumber={personal?.roll_number} />}
+              
               {activeTab === "Requests" && <RequestsTab rollNumber={personal?.roll_number} />}
               {activeTab === "Calendar" && <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">🗓️ Comprehensive Day-by-Day Calendar coming in Phase 2...</div>}
             </motion.div>
