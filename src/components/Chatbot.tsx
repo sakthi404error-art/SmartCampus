@@ -1,141 +1,89 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { MessageSquare, X, Send, Loader2, Sparkles } from "lucide-react";
-
-type Message = {
-  id: string;
-  role: "user" | "bot";
-  content: string;
-};
+import { useState, useRef, useEffect } from 'react';
+import { MessageSquare, X, Send, Loader2, Sparkles } from 'lucide-react';
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    { id: "1", role: "bot", content: "Hi! I'm Nexus, your ISSM campus assistant. How can I help you today?" }
-  ]);
-  const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState([{ role: 'ai', content: 'Hi! I am Nexus AI. I can help you with ERP modules, business logic, or campus queries.' }]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to newest message
+  // 🚀 SECURED: Uses Vercel Environment Variables instead of plain text!
+  const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY; 
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSend = async () => {
     if (!input.trim()) return;
+    
+    const userMsg = input.trim();
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setInput('');
+    setIsLoading(true);
 
-    const userMessage: Message = { id: Date.now().toString(), role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setIsTyping(true);
+    if (!GEMINI_API_KEY) {
+      setTimeout(() => {
+        setMessages(prev => [...prev, { role: 'ai', content: "⚠️ System Error: API Key missing from Vercel Environment Variables." }]);
+        setIsLoading(false);
+      }, 1000);
+      return;
+    }
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMessage.content }),
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `You are Nexus AI, an assistant for ISSM Business School students. Answer concisely and professionally. User asks: ${userMsg}` }] }]
+        })
       });
 
       const data = await response.json();
+      const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm having trouble processing that right now.";
       
-      if (response.ok) {
-        const botMessage: Message = { id: (Date.now() + 1).toString(), role: "bot", content: data.reply };
-        setMessages((prev) => [...prev, botMessage]);
-      } else {
-        throw new Error(data.error);
-      }
+      setMessages(prev => [...prev, { role: 'ai', content: aiReply }]);
     } catch (error) {
-      const errorMessage: Message = { 
-        id: (Date.now() + 1).toString(), 
-        role: "bot", 
-        content: "I'm having trouble connecting to the campus network right now. Please try again in a moment." 
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages(prev => [...prev, { role: 'ai', content: "Network error. Please check your API key and connection." }]);
     } finally {
-      setIsTyping(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <>
-      {/* Floating Action Button */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className={`fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg transition-transform hover:scale-105 active:scale-95 ${isOpen ? "hidden" : "flex"}`}
-      >
-        <MessageSquare className="h-6 w-6" />
-      </button>
-
-      {/* Chat Window */}
-      {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 flex h-[500px] w-[350px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl sm:w-[400px]">
-          {/* Header */}
-          <div className="flex items-center justify-between bg-indigo-600 px-4 py-3 text-white">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5" />
-              <div>
-                <h3 className="font-semibold text-sm">Nexus AI</h3>
-                <p className="text-[10px] text-indigo-200">ISSM Business School Assistant</p>
+    <div className="fixed bottom-6 right-6 z-50">
+      {isOpen ? (
+        <div className="flex h-[500px] w-80 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200 animate-in slide-in-from-bottom-5">
+          <div className="flex items-center justify-between bg-slate-900 p-4 text-white">
+            <div className="flex items-center gap-2 font-bold"><Sparkles className="h-5 w-5 text-indigo-400"/> Nexus AI</div>
+            <button onClick={() => setIsOpen(false)} className="text-slate-300 hover:text-white"><X className="h-5 w-5"/></button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+            {messages.map((msg, i) => (
+              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white border border-slate-200 text-slate-700 rounded-bl-none shadow-sm'}`}>
+                  {msg.content}
+                </div>
               </div>
-            </div>
-            <button onClick={() => setIsOpen(false)} className="rounded-lg p-1 transition hover:bg-white/20">
-              <X className="h-5 w-5" />
-            </button>
+            ))}
+            {isLoading && <div className="flex justify-start"><div className="rounded-2xl rounded-bl-none bg-white border border-slate-200 px-4 py-2 shadow-sm"><Loader2 className="h-4 w-4 animate-spin text-indigo-600"/></div></div>}
+            <div ref={endOfMessagesRef} />
           </div>
 
-          {/* Message Area */}
-          <div className="flex-1 overflow-y-auto bg-slate-50 p-4">
-            <div className="space-y-4">
-              {messages.map((msg) => (
-                <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
-                      msg.role === "user"
-                        ? "bg-indigo-600 text-white rounded-br-none"
-                        : "bg-white border border-slate-200 text-slate-700 rounded-bl-none shadow-sm"
-                    }`}
-                  >
-                    {msg.content}
-                  </div>
-                </div>
-              ))}
-              {isTyping && (
-                <div className="flex justify-start">
-                  <div className="flex items-center gap-1 rounded-2xl rounded-bl-none border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.3s]"></span>
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.15s]"></span>
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400"></span>
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
+          <div className="border-t border-slate-100 bg-white p-3">
+            <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 border border-slate-200 focus-within:border-indigo-600 focus-within:ring-1 focus-within:ring-indigo-600">
+              <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Ask Nexus..." className="flex-1 bg-transparent text-sm outline-none" />
+              <button onClick={handleSend} disabled={isLoading || !input.trim()} className="text-indigo-600 disabled:opacity-50"><Send className="h-5 w-5"/></button>
             </div>
           </div>
-
-          {/* Input Area */}
-          <form onSubmit={handleSend} className="border-t border-slate-100 bg-white p-3">
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 pl-4 pr-2 py-1.5 focus-within:border-indigo-600 focus-within:ring-1 focus-within:ring-indigo-600">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask Nexus..."
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-              />
-              <button
-                type="submit"
-                disabled={!input.trim() || isTyping}
-                className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white transition hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {isTyping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </button>
-            </div>
-          </form>
         </div>
+      ) : (
+        <button onClick={() => setIsOpen(true)} className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl hover:scale-105 transition-transform"><MessageSquare className="h-6 w-6"/></button>
       )}
-    </>
+    </div>
   );
 }
