@@ -10,11 +10,11 @@ export default function AdminLeaveQueue() {
 
   const fetchRequests = async () => {
     setLoading(true);
-    // 🚀 FIX: Removed the complex join that crashes without Foreign Keys
-    const { data, error } = await supabase.from("leave_requests").select("*").order("created_at", { ascending: false });
+    // 🚀 FIX: Removed the .order() command here too
+    const { data, error } = await supabase.from("leave_requests").select("*");
     
     if (error) alert("Admin DB Error: " + error.message);
-    if (data) setRequests(data);
+    if (data) setRequests(data.reverse()); // Reverses in browser to show newest first
     setLoading(false);
   };
 

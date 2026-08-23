@@ -16,11 +16,11 @@ export default function LeaveRequest({ rollNumber }: { rollNumber: string }) {
   }, [rollNumber]);
 
   const fetchHistory = async () => {
-    // 🚀 FIX: Will instantly alert us if there is a database issue
-    const { data, error } = await supabase.from("leave_requests").select("*").eq("roll_number", rollNumber).order("created_at", { ascending: false });
+    // 🚀 FIX: Removed the .order() command so it stops looking for created_at
+    const { data, error } = await supabase.from("leave_requests").select("*").eq("roll_number", rollNumber);
     
     if (error) alert("History Fetch Error: " + error.message);
-    if (data) setHistory(data);
+    if (data) setHistory(data.reverse()); // Manually reverse it in the browser instead of the database
   };
 
   const handleSubmit = async (e: any) => {
