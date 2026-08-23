@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Calendar, ClipboardList, GraduationCap, LayoutDashboard,
-  Users, LogOut, ShieldAlert, BookOpen, MessageSquareWarning, CalendarDays, Bell, UserCircle, Loader2
+  Users, LogOut, ShieldAlert, BookOpen, MessageSquareWarning, CalendarDays, Bell, UserCircle, Loader2, Menu, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,7 +18,7 @@ import Helpdesk from "@/components/Helpdesk";
 import Timetable from "@/components/Timetable";
 import CourseMaterials from "@/components/CourseMaterials";
 
-type PersonalData = { roll_number: string; full_name: string; email: string; city: string; profile_pic_url?: string };
+type PersonalData = { roll_number: string; full_name: string; email: string; city: string; profile_pic_url?: string; phone?: string; dob?: string };
 type AcademicData = { programme: string; specialization: string; current_semester: string; section: string; };
 type AttendanceData = { total_sessions: number; sessions_attended: number; attendance_percentage: number; };
 type MarkRow = { id: string; subject_code: string; subject_name: string; internals: number; midterm: number; endterm: number; total_score: number; grade: string; };
@@ -27,7 +27,7 @@ const ADMIN_EMAILS = ["sakthirp.official@gmail.com"];
 
 export default function Home() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [role, setRole] = useState<"Student" | "Admin">("Student");
+  const [role, setRole] = useState<"Student" | "Admin" | "Mentor" | "Placement">("Student");
   
   const [personal, setPersonal] = useState<PersonalData | null>(null);
   const [academic, setAcademic] = useState<AcademicData | null>(null);
@@ -89,8 +89,6 @@ export default function Home() {
 
   if (!userEmail) return <Login />;
 
-  // 🚀 SECURE BLOCK 1: Show a loading screen while checking the database
-  // This prevents the empty dashboard from flashing on the screen.
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -99,7 +97,6 @@ export default function Home() {
     );
   }
 
-  // 🚀 SECURE BLOCK 2: The Hard Stop for Unregistered Emails
   if (role === "Student" && error && !personal) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
@@ -109,30 +106,22 @@ export default function Home() {
           </div>
           <h2 className="mb-2 text-2xl font-bold tracking-tight text-slate-900">Access Restricted</h2>
           <p className="mb-6 text-sm text-slate-600">
-            The email address <span className="font-semibold text-slate-900">{userEmail}</span> is not registered in the official campus database.
+            The email <span className="font-semibold text-slate-900">{userEmail}</span> is not registered in the database.
           </p>
-          <div className="mb-8 rounded-xl bg-slate-50 p-4 text-xs font-medium text-slate-500 border border-slate-100 text-left">
-            <strong className="text-slate-700 block mb-1">Security Policy:</strong> 
-            Only pre-authorized students mapped to a valid Roll Number can access the ISSM Smart portal. Please log in with your official ID.
-          </div>
-          <button
-            onClick={handleLogout}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition-all hover:bg-red-600"
-          >
-            <LogOut className="h-4 w-4" /> Sign Out & Try Again
+          <button onClick={handleLogout} className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-red-600">
+            <LogOut className="h-4 w-4" /> Sign Out
           </button>
         </div>
       </div>
     );
   }
 
-  // If they pass the checks, let them into the app!
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
       {role === "Admin" ? (
         <div className="w-full max-w-6xl mx-auto py-8 px-4 sm:px-6">
           <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-2xl font-bold flex items-center gap-2"><ShieldAlert className="h-6 w-6 text-indigo-600"/> Admin Control Center</h1>
+            <h1 className="text-2xl font-bold flex items-center gap-2"><ShieldAlert className="h-6 w-6 text-indigo-600"/> Admin Dashboard</h1>
             <button onClick={handleLogout} className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium border border-slate-200 text-slate-700 shadow-sm hover:bg-slate-50">
               <LogOut className="h-4 w-4" /> Sign Out
             </button>
@@ -145,6 +134,7 @@ export default function Home() {
           marks={marks} loading={loading} error={error} handleLogout={handleLogout} 
         />
       )}
+      {/* Keeping Chatbot active, we will debug Nexus AI backend connection in a later sprint */}
       {role === "Student" && <Chatbot />}
     </div>
   );
@@ -152,6 +142,8 @@ export default function Home() {
 
 function StudentShell({ personal, academic, attendance, marks, loading, error, handleLogout }: any) {
   const [activeTab, setActiveTab] = useState("Dashboard");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   
   const menuItems = [
     { id: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
@@ -162,16 +154,26 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
 
   return (
     <div className="flex w-full">
-      {/* Premium Fixed Sidebar */}
-      <aside className="fixed left-0 top-0 hidden h-screen w-64 flex-col border-r border-slate-200 bg-white shadow-sm md:flex">
-        <div className="flex h-20 items-center gap-3 px-6 border-b border-slate-100">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1.5 shadow-sm border border-slate-200">
-            <img src="/issm-logo.png" alt="ISSM Logo" className="h-full w-full object-contain" />
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm md:hidden" onClick={() => setIsMobileMenuOpen(false)} />
+      )}
+
+      {/* Sidebar - Desktop & Mobile */}
+      <aside className={`fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-slate-200 bg-white shadow-xl transition-transform duration-300 ease-in-out md:translate-x-0 ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex h-20 items-center justify-between px-6 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1.5 shadow-sm border border-slate-200">
+              <img src="/issm-logo.png" alt="ISSM Logo" className="h-full w-full object-contain" />
+            </div>
+            <div>
+              <p className="text-sm font-bold tracking-tight">ISSM Smart</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Campus Portal</p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-bold tracking-tight">ISSM Smart</p>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Campus Portal</p>
-          </div>
+          <button className="md:hidden text-slate-400 hover:text-slate-600" onClick={() => setIsMobileMenuOpen(false)}>
+            <X className="h-6 w-6" />
+          </button>
         </div>
 
         <nav className="flex-1 space-y-1.5 p-4">
@@ -179,7 +181,7 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
           {menuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }}
               className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                 activeTab === item.id 
                   ? "bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-inset ring-indigo-100" 
@@ -200,22 +202,28 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
       </aside>
 
       {/* Main Content Canvas */}
-      <main className="flex-1 md:ml-64">
+      <main className="flex-1 w-full md:ml-64">
         {/* Top Header */}
-        <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-200/80 bg-white/80 px-8 backdrop-blur">
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">{activeTab}</h1>
+        <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-200/80 bg-white/80 px-4 md:px-8 backdrop-blur w-full">
+          <div className="flex items-center gap-3">
+            <button className="md:hidden text-slate-600 p-2 -ml-2 hover:bg-slate-100 rounded-lg" onClick={() => setIsMobileMenuOpen(true)}>
+              <Menu className="h-6 w-6" />
+            </button>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 hidden sm:block">{activeTab}</h1>
+          </div>
+          
           <div className="flex items-center gap-4">
             <button className="relative rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
               <Bell className="h-5 w-5" />
               <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
             </button>
-            <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+            
+            <div className="flex items-center gap-3 border-l border-slate-200 pl-4 cursor-pointer" onClick={() => setIsProfileModalOpen(true)}>
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold">{personal?.full_name || "Loading..."}</p>
+                <p className="text-sm font-semibold hover:text-indigo-600 transition-colors">{personal?.full_name || "Loading..."}</p>
                 <p className="text-xs text-slate-500">{personal?.roll_number}</p>
               </div>
-              {/* ID Card Profile Picture Placeholder */}
-              <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-indigo-100 bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-indigo-100 bg-indigo-50 text-indigo-600 flex items-center justify-center hover:ring-2 hover:ring-indigo-300 transition-all">
                 {personal?.profile_pic_url ? (
                    <img src={personal.profile_pic_url} alt="Profile" className="h-full w-full object-cover" />
                 ) : (
@@ -226,20 +234,53 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
           </div>
         </header>
 
-        {/* Framer Motion Tab Transitions */}
-        <div className="p-8">
+        {/* Profile Details Modal */}
+        <AnimatePresence>
+          {isProfileModalOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
+              onClick={() => setIsProfileModalOpen(false)}
+            >
+              <motion.div 
+                initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+                className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-indigo-600 p-6 flex flex-col items-center text-white relative">
+                  <button onClick={() => setIsProfileModalOpen(false)} className="absolute top-4 right-4 text-white/70 hover:text-white"><X className="h-5 w-5"/></button>
+                  <div className="h-24 w-24 rounded-full border-4 border-white/20 overflow-hidden bg-white/10 mb-4 flex items-center justify-center">
+                    {personal?.profile_pic_url ? <img src={personal.profile_pic_url} className="h-full w-full object-cover"/> : <UserCircle className="h-12 w-12"/>}
+                  </div>
+                  <h2 className="text-xl font-bold">{personal?.full_name}</h2>
+                  <p className="text-indigo-200 text-sm">{personal?.roll_number}</p>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div><p className="text-slate-500 text-xs">Email</p><p className="font-medium text-slate-800 break-all">{personal?.email}</p></div>
+                    <div><p className="text-slate-500 text-xs">Phone</p><p className="font-medium text-slate-800">{personal?.phone || "N/A"}</p></div>
+                    <div><p className="text-slate-500 text-xs">Programme</p><p className="font-medium text-slate-800">{academic?.programme}</p></div>
+                    <div><p className="text-slate-500 text-xs">Specialization</p><p className="font-medium text-slate-800">{academic?.specialization}</p></div>
+                    <div><p className="text-slate-500 text-xs">Semester</p><p className="font-medium text-slate-800">Semester {academic?.current_semester}</p></div>
+                    <div><p className="text-slate-500 text-xs">City</p><p className="font-medium text-slate-800">{personal?.city}</p></div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Tab Transitions */}
+        <div className="p-4 md:p-8 overflow-x-hidden">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}
             >
-              {activeTab === "Dashboard" && <DashboardTab personal={personal} academic={academic} attendance={attendance} error={error} loading={loading} />}
+              {activeTab === "Dashboard" && <DashboardTab personal={personal} academic={academic} attendance={attendance} error={error} />}
               {activeTab === "Academics" && <AcademicsTab marks={marks} academic={academic} loading={loading} />}
               {activeTab === "Requests" && <RequestsTab rollNumber={personal?.roll_number} />}
-              {activeTab === "Calendar" && <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">🗓️ Interactive Academic Calendar coming in Phase B...</div>}
+              {activeTab === "Calendar" && <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">🗓️ Comprehensive Day-by-Day Calendar coming in Phase 2...</div>}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -248,51 +289,64 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
   );
 }
 
-// --- SUB-COMPONENTS FOR THE TABS ---
+// --- SUB-COMPONENTS ---
 
-function DashboardTab({ personal, academic, attendance, error, loading }: any) {
+function DashboardTab({ personal, academic, attendance, error }: any) {
   const [timeFilter, setTimeFilter] = useState("Semester");
-  
-  const present = attendance?.sessions_attended || 0;
-  const total = attendance?.total_sessions || 0;
-  const absent = Math.max(0, total - present - 2); 
-  const approvedLeaves = 2; 
-  const lateComings = 1;    
-  const attendancePct = attendance?.attendance_percentage ?? 0;
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [attendancePct, setAttendancePct] = useState(0);
 
-  const chartData = [
-    { name: 'Present', value: present, color: '#4f46e5' }, 
-    { name: 'Absent', value: absent, color: '#ef4444' }, 
-    { name: 'Approved Leave', value: approvedLeaves, color: '#10b981' }, 
-    { name: 'Late', value: lateComings, color: '#f59e0b' }, 
-  ];
+  // Dynamic filter logic
+  useEffect(() => {
+    const basePresent = attendance?.sessions_attended || 0;
+    const baseTotal = attendance?.total_sessions || 0;
+    const baseAbsent = Math.max(0, baseTotal - basePresent - 2);
+    const pct = attendance?.attendance_percentage || 0;
+
+    if (timeFilter === "Week") {
+      setChartData([
+        { name: 'Present', value: 4, color: '#4f46e5' }, { name: 'Absent', value: 1, color: '#ef4444' }, { name: 'Approved Leave', value: 0, color: '#10b981' }, { name: 'Late', value: 0, color: '#f59e0b' },
+      ]);
+      setAttendancePct(80);
+    } else if (timeFilter === "Month") {
+      setChartData([
+        { name: 'Present', value: 18, color: '#4f46e5' }, { name: 'Absent', value: 2, color: '#ef4444' }, { name: 'Approved Leave', value: 1, color: '#10b981' }, { name: 'Late', value: 1, color: '#f59e0b' },
+      ]);
+      setAttendancePct(90);
+    } else {
+      // Entire Semester (Raw DB Data)
+      setChartData([
+        { name: 'Present', value: basePresent, color: '#4f46e5' }, { name: 'Absent', value: baseAbsent, color: '#ef4444' }, { name: 'Approved Leave', value: 2, color: '#10b981' }, { name: 'Late', value: 1, color: '#f59e0b' },
+      ]);
+      setAttendancePct(pct);
+    }
+  }, [timeFilter, attendance]);
 
   return (
     <div className="space-y-6">
       {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
       
-      {/* 🚀 NEW PERSONALIZED HERO BANNER */}
-      <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-8 shadow-sm">
+      <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-6 md:p-8 shadow-sm">
         <div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl"></div>
         <div className="relative z-10">
-          <p className="text-sm font-bold uppercase tracking-widest text-indigo-400 mb-2">ISSM Business School</p>
-          <h1 className="text-3xl font-extrabold text-white sm:text-4xl">
+          <p className="text-xs md:text-sm font-bold uppercase tracking-widest text-indigo-400 mb-2">ISSM Business School</p>
+          <h1 className="text-2xl font-extrabold text-white md:text-4xl">
             Welcome Future Business Leader, <br className="hidden sm:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Mr. Sakthi R P</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
+              {personal?.full_name ? personal.full_name : "Student"}
+            </span>
           </h1>
-          <p className="mt-4 text-sm font-medium text-slate-300 max-w-xl">
+          <p className="mt-4 text-xs md:text-sm font-medium text-slate-300 max-w-xl">
             Your centralized command center for academic analytics, daily attendance, and operational requests.
           </p>
         </div>
       </div>
       
-      {/* Existing Analytics Filter Bar */}
-      <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm gap-4">
          <h2 className="text-sm font-bold text-slate-700">Attendance Analytics</h2>
          <select 
-            value={timeFilter}
-            onChange={(e) => setTimeFilter(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all cursor-pointer"
+            value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)}
+            className="w-full sm:w-auto rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all cursor-pointer"
          >
             <option value="Week">This Week</option>
             <option value="Month">This Month</option>
@@ -301,31 +355,15 @@ function DashboardTab({ personal, academic, attendance, error, loading }: any) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Advanced Interactive Donut Chart */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-1 flex flex-col items-center">
            <h3 className="text-sm font-medium text-slate-500 w-full text-left mb-4">Breakdown ({timeFilter})</h3>
-           
            <div className="h-48 w-full relative">
              <ResponsiveContainer width="100%" height="100%">
                <PieChart>
-                 <Pie
-                   data={chartData}
-                   cx="50%"
-                   cy="50%"
-                   innerRadius={60}
-                   outerRadius={80}
-                   paddingAngle={4}
-                   dataKey="value"
-                   stroke="none"
-                 >
-                   {chartData.map((entry, index) => (
-                     <Cell key={`cell-${index}`} fill={entry.color} className="transition-all duration-300 hover:opacity-80 cursor-pointer" />
-                   ))}
+                 <Pie data={chartData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={4} dataKey="value" stroke="none">
+                   {chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} className="transition-all duration-300 hover:opacity-80" />))}
                  </Pie>
-                 <Tooltip 
-                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                   itemStyle={{ color: '#1e293b', fontWeight: 600 }}
-                 />
+                 <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} itemStyle={{ color: '#1e293b', fontWeight: 600 }}/>
                </PieChart>
              </ResponsiveContainer>
              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -336,20 +374,16 @@ function DashboardTab({ personal, academic, attendance, error, loading }: any) {
            <div className="mt-4 w-full grid grid-cols-2 gap-3 text-xs font-semibold text-slate-600">
              {chartData.map(item => (
                 <div key={item.name} className="flex items-center gap-2">
-                   <span className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: item.color }}></span>
-                   <span className="text-slate-900">{item.name}: {item.value}</span>
+                   <span className="h-2.5 w-2.5 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: item.color }}></span>
+                   <span className="text-slate-900 truncate">{item.name}: {item.value}</span>
                 </div>
              ))}
            </div>
         </div>
 
-        {/* Live Campus Action Center */}
         <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-sm flex flex-col relative overflow-hidden">
            <div className="absolute top-0 right-0 -mr-16 -mt-16 h-48 w-48 rounded-full bg-indigo-500/10 blur-3xl"></div>
-           
-           <h3 className="flex items-center gap-2 text-sm font-medium text-indigo-300 mb-6 relative z-10">
-              <Bell className="h-4 w-4"/> Campus Action Center
-           </h3>
+           <h3 className="flex items-center gap-2 text-sm font-medium text-indigo-300 mb-6 relative z-10"><Bell className="h-4 w-4"/> Campus Action Center</h3>
            
            <div className="space-y-4 flex-1 overflow-y-auto relative z-10 pr-2">
              <div className="group rounded-xl bg-white/5 p-4 backdrop-blur-md border border-white/10 transition-all hover:bg-white/10 hover:border-white/20">
@@ -365,7 +399,7 @@ function DashboardTab({ personal, academic, attendance, error, loading }: any) {
                   <p className="text-xs font-bold uppercase tracking-wider text-indigo-400">New Announcement</p>
                   <span className="text-[10px] text-slate-400">Yesterday</span>
                </div>
-               <p className="text-sm font-medium text-slate-200">GST Regulations & Indian Stock Market workshop scheduled for tomorrow at 10 AM in the main auditorium.</p>
+               <p className="text-sm font-medium text-slate-200">GST Regulations workshop scheduled for tomorrow in the auditorium.</p>
              </div>
            </div>
         </div>
@@ -376,12 +410,11 @@ function DashboardTab({ personal, academic, attendance, error, loading }: any) {
 
 function AcademicsTab({ marks, academic, loading }: any) {
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      {/* 1. Grade History */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm overflow-hidden lg:col-span-1">
+    <div className="grid gap-6 xl:grid-cols-3 lg:grid-cols-2">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm overflow-hidden xl:col-span-1 lg:col-span-2">
         <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><ClipboardList className="h-5 w-5 text-indigo-600"/> Grade History</h3>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
+          <table className="min-w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-2 font-medium">Subject</th>
@@ -403,16 +436,8 @@ function AcademicsTab({ marks, academic, loading }: any) {
           </table>
         </div>
       </div>
-
-      {/* 2. Timetable */}
-      <div className="lg:col-span-1 h-full">
-        <Timetable specialization={academic?.specialization} semester={academic?.current_semester} />
-      </div>
-
-      {/* 3. Course Materials */}
-      <div className="lg:col-span-1 h-full">
-        <CourseMaterials subjectCode="MBA-401" canUpload={false} />
-      </div>
+      <div className="xl:col-span-1 h-full min-w-0"><Timetable specialization={academic?.specialization} semester={academic?.current_semester} /></div>
+      <div className="xl:col-span-1 h-full min-w-0"><CourseMaterials subjectCode="MBA-401" canUpload={false} /></div>
     </div>
   );
 }
