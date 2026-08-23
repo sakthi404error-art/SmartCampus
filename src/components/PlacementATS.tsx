@@ -21,9 +21,11 @@ export default function PlacementATS({ rollNumber }: { rollNumber?: string }) {
     setIsScanning(true);
     
     setTimeout(() => {
-      // Dynamic Randomization so it NEVER repeats the exact same feedback twice.
-      const randomScore = Math.floor(Math.random() * (95 - 65 + 1) + 65);
-      const isGood = randomScore >= 80;
+      // 🚀 THE FIX: Generates a consistent score based on the specific file's name and size.
+      // If you upload the same file, you get the EXACT same result.
+      const fileHash = file.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) + file.size;
+      const consistentScore = (fileHash % 21) + 75; // Always generates a score between 75 and 95 for a specific file
+      const isGood = consistentScore >= 80;
       
       const roleMatch = resumeType === "Specialization" 
         ? "IT Business Analyst / SAP Consultant / Systems Manager" 
@@ -49,7 +51,7 @@ export default function PlacementATS({ rollNumber }: { rollNumber?: string }) {
       ];
 
       setAnalysisResult({
-        score: randomScore,
+        score: consistentScore,
         roleMatch: roleMatch,
         expectedSalary: isGood ? "₹10L - ₹18L PA" : "₹6L - ₹9L PA",
         strengths: strengthsList,
@@ -77,7 +79,6 @@ export default function PlacementATS({ rollNumber }: { rollNumber?: string }) {
         </div>
 
         <div className="grid gap-8 lg:grid-cols-2">
-          {/* Upload Section */}
           <div className="space-y-6">
             <div>
               <label className="text-sm font-bold text-slate-700 mb-2 block">Select Resume Profile</label>
@@ -109,7 +110,6 @@ export default function PlacementATS({ rollNumber }: { rollNumber?: string }) {
             </button>
           </div>
 
-          {/* Results Section */}
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
             {!analysisResult && !isScanning && (
               <div className="flex h-full flex-col items-center justify-center text-center text-slate-400">
