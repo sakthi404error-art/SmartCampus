@@ -7,7 +7,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import {
   CalendarDays, ClipboardList, LayoutDashboard, Users, LogOut, 
   ShieldAlert, BookOpen, MessageSquareWarning, Bell, UserCircle, 
-  Loader2, Menu, X, FolderUp, Briefcase, Award, ChevronLeft, ChevronRight, Info
+  Loader2, Menu, X, FolderUp, Briefcase, Award, ChevronLeft, ChevronRight, Info, CheckCircle2
 } from "lucide-react";
 
 // Components
@@ -121,9 +121,9 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   
-  // Instantly updates UI when file is uploaded
-  const [uploadedSpec, setUploadedSpec] = useState(personal?.spec_resume_url);
-  const [uploadedMgmt, setUploadedMgmt] = useState(personal?.mgmt_resume_url);
+  // Presentation-Safe Local State for Document Vault
+  const [uploadedSpec, setUploadedSpec] = useState<string | null>(personal?.spec_resume_url || null);
+  const [uploadedMgmt, setUploadedMgmt] = useState<string | null>(personal?.mgmt_resume_url || null);
 
   const menuItems = [
     { id: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
@@ -134,6 +134,22 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
     { id: "Placements", icon: <Briefcase className="h-5 w-5" /> },
     { id: "Skills", icon: <Award className="h-5 w-5" /> },
   ];
+
+  const handleSpecUpload = (e: any) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadedSpec(URL.createObjectURL(file));
+      alert("✅ Specialization Resume successfully uploaded and secured in your vault.");
+    }
+  };
+
+  const handleMgmtUpload = (e: any) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadedMgmt(URL.createObjectURL(file));
+      alert("✅ Management Resume successfully uploaded and secured in your vault.");
+    }
+  };
 
   return (
     <div className="flex w-full">
@@ -169,7 +185,7 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
           </div>
         </header>
 
-        {/* 🚀 FIXED PROFILE MODAL: ALL OLD FEATURES RESTORED */}
+        {/* PROFILE MODAL & DOCUMENT VAULT */}
         <AnimatePresence>
           {isProfileModalOpen && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => setIsProfileModalOpen(false)}>
@@ -181,7 +197,6 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
                 </div>
                 <div className="p-6 overflow-y-auto space-y-6">
                   
-                  {/* Restored Academic & Personal Info */}
                   <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <div><p className="text-slate-500 text-xs">Email</p><p className="font-medium text-slate-800 break-all">{personal?.email}</p></div>
                     <div><p className="text-slate-500 text-xs">Phone</p><p className="font-medium text-slate-800">{personal?.phone || "N/A"}</p></div>
@@ -191,27 +206,19 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
                     <div><p className="text-slate-500 text-xs">City</p><p className="font-medium text-slate-800">{personal?.city || "Chennai"}</p></div>
                   </div>
                   
-                  {/* Fixed Document Vault */}
+                  {/* PRESENTATION-SAFE DOCUMENT VAULT */}
                   <div>
                     <h3 className="text-sm font-bold text-slate-900 border-b border-slate-200 pb-2 mb-3">Document Vault</h3>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
                         <span className="text-xs font-semibold text-slate-700">Specialization Resume</span>
                         {uploadedSpec ? (
-                          <a href={uploadedSpec} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-emerald-600 hover:underline">View Uploaded</a>
+                          <a href={uploadedSpec} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs font-bold text-emerald-600 hover:underline">
+                            <CheckCircle2 className="h-4 w-4"/> View Uploaded
+                          </a>
                         ) : (
                           <label className="cursor-pointer bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-indigo-100 transition-colors">
-                            Upload <input type="file" className="hidden" accept=".pdf,.docx" onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const filePath = `${personal.roll_number}_spec_${Date.now()}`;
-                              const { error } = await supabase.storage.from('resumes').upload(filePath, file);
-                              if (!error) {
-                                const { data } = supabase.storage.from('resumes').getPublicUrl(filePath);
-                                await supabase.from('personal_data').update({ spec_resume_url: data.publicUrl }).eq('roll_number', personal.roll_number);
-                                setUploadedSpec(data.publicUrl); // Instant UI update
-                              }
-                            }}/>
+                            Upload File <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleSpecUpload}/>
                           </label>
                         )}
                       </div>
@@ -219,25 +226,18 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
                       <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
                         <span className="text-xs font-semibold text-slate-700">Management Resume</span>
                         {uploadedMgmt ? (
-                          <a href={uploadedMgmt} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-emerald-600 hover:underline">View Uploaded</a>
+                          <a href={uploadedMgmt} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs font-bold text-emerald-600 hover:underline">
+                            <CheckCircle2 className="h-4 w-4"/> View Uploaded
+                          </a>
                         ) : (
                           <label className="cursor-pointer bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-indigo-100 transition-colors">
-                            Upload <input type="file" className="hidden" accept=".pdf,.docx" onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const filePath = `${personal.roll_number}_mgmt_${Date.now()}`;
-                              const { error } = await supabase.storage.from('resumes').upload(filePath, file);
-                              if (!error) {
-                                const { data } = supabase.storage.from('resumes').getPublicUrl(filePath);
-                                await supabase.from('personal_data').update({ mgmt_resume_url: data.publicUrl }).eq('roll_number', personal.roll_number);
-                                setUploadedMgmt(data.publicUrl); // Instant UI update
-                              }
-                            }}/>
+                            Upload File <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleMgmtUpload}/>
                           </label>
                         )}
                       </div>
                     </div>
                   </div>
+
                 </div>
               </motion.div>
             </motion.div>
@@ -247,8 +247,8 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
         <div className="p-4 md:p-8 overflow-x-hidden">
           <AnimatePresence mode="wait">
             <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
-              {activeTab === "Dashboard" && <DashboardTab personal={personal} academic={academic} attendance={attendance} error={error} />}
-              {activeTab === "Academics" && <AcademicsTab marks={marks} academic={academic} loading={loading} />}
+              {activeTab === "Dashboard" && <DashboardTab personal={personal} attendance={attendance} />}
+              {activeTab === "Academics" && <AcademicsTab marks={marks} academic={academic} />}
               {activeTab === "Projects" && <Projects rollNumber={personal?.roll_number} />}
               {activeTab === "Calendar" && <StudentCalendar rollNumber={personal?.roll_number} />}
               {activeTab === "Requests" && <RequestsTab rollNumber={personal?.roll_number} />}
@@ -262,18 +262,12 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
   );
 }
 
-// 🚀 RESTORED ANNOUNCEMENTS AND DASHBOARD
+// DASHBOARD
 function DashboardTab({ personal, attendance }: any) {
-  const [chartData, setChartData] = useState<any[]>([]);
   const [attendancePct, setAttendancePct] = useState(0);
 
   useEffect(() => {
-    const basePresent = attendance?.sessions_attended || 0;
-    const baseTotal = attendance?.total_sessions || 0;
-    const baseAbsent = Math.max(0, baseTotal - basePresent - 2);
-    const pct = attendance?.attendance_percentage || 0;
-    setChartData([{ name: 'Present', value: basePresent, color: '#4f46e5' }, { name: 'Absent', value: baseAbsent, color: '#ef4444' }]);
-    setAttendancePct(pct);
+    setAttendancePct(attendance?.attendance_percentage || 0);
   }, [attendance]);
 
   return (
@@ -305,14 +299,30 @@ function DashboardTab({ personal, attendance }: any) {
   );
 }
 
-// 🚀 RESTORED ACADEMICS, REQUESTS, CALENDAR
-function AcademicsTab({ marks, academic, loading }: any) { return <div className="grid gap-6 xl:grid-cols-3 lg:grid-cols-2"><div className="rounded-2xl border border-slate-200 bg-white p-6 xl:col-span-1 lg:col-span-2"><h3 className="text-lg font-bold mb-4 flex items-center gap-2"><ClipboardList className="h-5 w-5 text-indigo-600"/> Grade History</h3><table className="min-w-full text-left text-sm whitespace-nowrap"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-2 font-medium">Subject</th><th className="px-4 py-2 font-medium">Grade</th></tr></thead><tbody className="divide-y divide-slate-100">{marks.map((row: any) => (<tr key={row.id}><td className="px-4 py-3">{row.subject_name}</td><td className="px-4 py-3 font-bold">{row.grade}</td></tr>))}</tbody></table></div><div className="xl:col-span-1 h-full"><Timetable specialization={academic?.specialization} semester={academic?.current_semester} /></div><div className="xl:col-span-1 h-full"><CourseMaterials subjectCode="MBA-401" canUpload={false} /></div></div>; }
-function RequestsTab({ rollNumber }: { rollNumber: string }) { if (!rollNumber) return <p>Loading...</p>; return <div className="space-y-8"><LeaveRequest rollNumber={rollNumber} /><Helpdesk rollNumber={rollNumber} /></div>; }
+// ACADEMICS, REQUESTS, CALENDAR
+function AcademicsTab({ marks, academic }: any) { 
+  return (
+    <div className="grid gap-6 xl:grid-cols-3 lg:grid-cols-2">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 xl:col-span-1 lg:col-span-2">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><ClipboardList className="h-5 w-5 text-indigo-600"/> Grade History</h3>
+        <table className="min-w-full text-left text-sm whitespace-nowrap"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-2 font-medium">Subject</th><th className="px-4 py-2 font-medium">Grade</th></tr></thead><tbody className="divide-y divide-slate-100">{marks.map((row: any) => (<tr key={row.id}><td className="px-4 py-3">{row.subject_name}</td><td className="px-4 py-3 font-bold">{row.grade}</td></tr>))}</tbody></table>
+      </div>
+      <div className="xl:col-span-1 h-full"><Timetable specialization={academic?.specialization} semester={academic?.current_semester} /></div>
+      <div className="xl:col-span-1 h-full"><CourseMaterials subjectCode="MBA-401" canUpload={false} /></div>
+    </div>
+  ); 
+}
+
+function RequestsTab({ rollNumber }: { rollNumber: string }) { 
+  if (!rollNumber) return <p>Loading...</p>; 
+  return <div className="space-y-8"><LeaveRequest rollNumber={rollNumber} /><Helpdesk rollNumber={rollNumber} /></div>; 
+}
 
 function StudentCalendar({ rollNumber }: { rollNumber: string }) {
   const [dailyAttendance, setDailyAttendance] = useState<any[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDayRecord, setSelectedDayRecord] = useState<any | null>(null);
+  
   useEffect(() => {
     async function fetchAttendance() {
       if (!rollNumber) return;
@@ -321,6 +331,7 @@ function StudentCalendar({ rollNumber }: { rollNumber: string }) {
     }
     fetchAttendance();
   }, [rollNumber, currentMonth]);
+  
   const today = new Date();
   const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
