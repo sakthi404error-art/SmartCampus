@@ -96,10 +96,19 @@ export default function AdminDashboard() {
       {selectedStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" onClick={() => setSelectedStudent(null)}>
           <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-slate-900 to-indigo-900 p-6 text-white relative flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold">{selectedStudent.full_name}</h2>
-                <p className="text-indigo-200 text-sm mt-1">{selectedStudent.roll_number} | {selectedStudent.email}</p>
+          <div className="bg-gradient-to-r from-slate-900 to-indigo-900 p-6 text-white relative flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-white/20 bg-white/10 flex items-center justify-center">
+                  {selectedStudent.profile_pic_url ? (
+                    <img src={selectedStudent.profile_pic_url} className="h-full w-full object-cover" />
+                  ) : (
+                    <Users className="h-8 w-8 text-white/50"/>
+                  )}
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">{selectedStudent.full_name}</h2>
+                  <p className="text-indigo-200 text-sm mt-1">{selectedStudent.roll_number} | {selectedStudent.email}</p>
+                </div>
               </div>
               <button onClick={() => setSelectedStudent(null)} className="text-white/70 hover:text-white"><X className="h-6 w-6"/></button>
             </div>
