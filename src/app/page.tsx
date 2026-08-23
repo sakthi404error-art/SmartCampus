@@ -7,7 +7,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import {
   CalendarDays, ClipboardList, LayoutDashboard, Users, LogOut, 
   ShieldAlert, BookOpen, MessageSquareWarning, Bell, UserCircle, 
-  Loader2, Menu, X, FolderUp, Briefcase, Award, ChevronLeft, ChevronRight, Info, CheckCircle2
+  Loader2, Menu, X, FolderUp, Briefcase, Award, ChevronLeft, ChevronRight, Info, CheckCircle2, Trash2
 } from "lucide-react";
 
 // Components
@@ -121,9 +121,18 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   
-  // Presentation-Safe Local State for Document Vault
-  const [uploadedSpec, setUploadedSpec] = useState<string | null>(personal?.spec_resume_url || null);
-  const [uploadedMgmt, setUploadedMgmt] = useState<string | null>(personal?.mgmt_resume_url || null);
+  // Real Database States
+  const [uploadedSpec, setUploadedSpec] = useState<string | null>(null);
+  const [uploadedMgmt, setUploadedMgmt] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Sync state with Database on load
+  useEffect(() => {
+    if (personal) {
+      setUploadedSpec(personal.spec_resume_url || null);
+      setUploadedMgmt(personal.mgmt_resume_url || null);
+    }
+  }, [personal]);
 
   const menuItems = [
     { id: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
@@ -135,19 +144,68 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
     { id: "Skills", icon: <Award className="h-5 w-5" /> },
   ];
 
-  const handleSpecUpload = (e: any) => {
+  // REAL SUPABASE UPLOAD LOGIC
+  const handleSpecUpload = async (e: any) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setUploadedSpec(URL.createObjectURL(file));
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const filePath = `${personal.roll_number}_spec_${Date.now()}`;
+      const { error: uploadError } = await supabase.storage.from('resumes').upload(filePath, file);
+      if (uploadError) throw new Error("Storage Error: Check if 'resumes' bucket exists and is public.");
+      
+      const { data } = supabase.storage.from('resumes').getPublicUrl(filePath);
+      const { error: dbError } = await supabase.from('personal_data').update({ spec_resume_url: data.publicUrl }).eq('roll_number', personal.roll_number);
+      if (dbError) throw new Error("Database Error saving URL.");
+      
+      setUploadedSpec(data.publicUrl);
       alert("✅ Specialization Resume successfully uploaded and secured in your vault.");
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
-  const handleMgmtUpload = (e: any) => {
+  const handleMgmtUpload = async (e: any) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setUploadedMgmt(URL.createObjectURL(file));
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const filePath = `${personal.roll_number}_mgmt_${Date.now()}`;
+      const { error: uploadError } = await supabase.storage.from('resumes').upload(filePath, file);
+      if (uploadError) throw new Error("Storage Error: Check if 'resumes' bucket exists and is public.");
+      
+      const { data } = supabase.storage.from('resumes').getPublicUrl(filePath);
+      const { error: dbError } = await supabase.from('personal_data').update({ mgmt_resume_url: data.publicUrl }).eq('roll_number', personal.roll_number);
+      if (dbError) throw new Error("Database Error saving URL.");
+      
+      setUploadedMgmt(data.publicUrl);
       alert("✅ Management Resume successfully uploaded and secured in your vault.");
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // DELETE RESUME LOGIC
+  const handleDeleteResume = async (type: 'spec' | 'mgmt') => {
+    if (!confirm("Are you sure you want to delete this resume?")) return;
+    setIsUploading(true);
+    const column = type === 'spec' ? 'spec_resume_url' : 'mgmt_resume_url';
+    try {
+      const { error } = await supabase.from('personal_data').update({ [column]: null }).eq('roll_number', personal.roll_number);
+      if (error) throw error;
+      
+      if (type === 'spec') setUploadedSpec(null);
+      else setUploadedMgmt(null);
+      
+      alert("🗑️ Resume deleted successfully. You can now upload a new one.");
+    } catch (err: any) {
+      alert("Error deleting resume: " + err.message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -206,16 +264,24 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
                     <div><p className="text-slate-500 text-xs">City</p><p className="font-medium text-slate-800">{personal?.city || "Chennai"}</p></div>
                   </div>
                   
-                  {/* PRESENTATION-SAFE DOCUMENT VAULT */}
+                  {/* REAL DB DOCUMENT VAULT WITH DELETE BUTTONS */}
                   <div>
                     <h3 className="text-sm font-bold text-slate-900 border-b border-slate-200 pb-2 mb-3">Document Vault</h3>
                     <div className="space-y-3">
+                      
                       <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
                         <span className="text-xs font-semibold text-slate-700">Specialization Resume</span>
-                        {uploadedSpec ? (
-                          <a href={uploadedSpec} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs font-bold text-emerald-600 hover:underline">
-                            <CheckCircle2 className="h-4 w-4"/> View Uploaded
-                          </a>
+                        {isUploading ? (
+                           <Loader2 className="h-4 w-4 animate-spin text-indigo-600"/>
+                        ) : uploadedSpec ? (
+                          <div className="flex items-center gap-3">
+                            <a href={uploadedSpec} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs font-bold text-emerald-600 hover:underline">
+                              <CheckCircle2 className="h-4 w-4"/> View
+                            </a>
+                            <button onClick={() => handleDeleteResume('spec')} className="text-red-500 hover:text-red-700 p-1 rounded-md bg-red-50 hover:bg-red-100 transition-colors" title="Delete Resume">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         ) : (
                           <label className="cursor-pointer bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-indigo-100 transition-colors">
                             Upload File <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleSpecUpload}/>
@@ -225,16 +291,24 @@ function StudentShell({ personal, academic, attendance, marks, loading, error, h
 
                       <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
                         <span className="text-xs font-semibold text-slate-700">Management Resume</span>
-                        {uploadedMgmt ? (
-                          <a href={uploadedMgmt} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs font-bold text-emerald-600 hover:underline">
-                            <CheckCircle2 className="h-4 w-4"/> View Uploaded
-                          </a>
+                        {isUploading ? (
+                           <Loader2 className="h-4 w-4 animate-spin text-indigo-600"/>
+                        ) : uploadedMgmt ? (
+                          <div className="flex items-center gap-3">
+                            <a href={uploadedMgmt} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs font-bold text-emerald-600 hover:underline">
+                              <CheckCircle2 className="h-4 w-4"/> View
+                            </a>
+                            <button onClick={() => handleDeleteResume('mgmt')} className="text-red-500 hover:text-red-700 p-1 rounded-md bg-red-50 hover:bg-red-100 transition-colors" title="Delete Resume">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         ) : (
                           <label className="cursor-pointer bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-indigo-100 transition-colors">
                             Upload File <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleMgmtUpload}/>
                           </label>
                         )}
                       </div>
+
                     </div>
                   </div>
 
