@@ -12,29 +12,40 @@ export default function MentorDashboard({ mentorEmail }: { mentorEmail: string }
   const [activeQueryId, setActiveQueryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // 🚀 NEW STATE FOR THE MENTEE PROFILE MODAL
   const [selectedMentee, setSelectedMentee] = useState<any | null>(null);
 
   useEffect(() => {
     async function fetchMentorData() {
       setLoading(true);
+      
+      // 1. Fetch the students
       const { data: students } = await supabase
         .from("personal_data")
-        .select("*, academic_data(current_semester, programme, specialization), attendance_data(total_sessions, sessions_attended, attendance_percentage)")
+        .select("*")
         .eq("mentor_email", mentorEmail);
 
-      if (students) {
-        setMentees(students);
+      if (students && students.length > 0) {
         const rollNumbers = students.map((s: any) => s.roll_number);
-        if (rollNumbers.length > 0) {
-          const { data: studentQueries } = await supabase
-            .from("student_queries")
-            .select("*")
-            .in("student_roll_number", rollNumbers)
-            .order("created_at", { ascending: false });
-          
-          if (studentQueries) setQueries(studentQueries);
-        }
+
+        // 2. Fetch all their related data manually to bypass Foreign Key requirements
+        const [academicRes, attendanceRes, queryRes] = await Promise.all([
+          supabase.from("academic_data").select("*").in("roll_number", rollNumbers),
+          supabase.from("attendance_data").select("*").in("roll_number", rollNumbers),
+          supabase.from("student_queries").select("*").in("student_roll_number", rollNumbers).order("created_at", { ascending: false })
+        ]);
+
+        // 3. Combine the data together
+        const combinedMentees = students.map(student => ({
+          ...student,
+          academic_data: academicRes.data?.filter(a => a.roll_number === student.roll_number) || [],
+          attendance_data: attendanceRes.data?.filter(a => a.roll_number === student.roll_number) || [],
+        }));
+
+        setMentees(combinedMentees);
+        if (queryRes.data) setQueries(queryRes.data);
+      } else {
+        setMentees([]);
+        setQueries([]);
       }
       setLoading(false);
     }
@@ -61,18 +72,15 @@ export default function MentorDashboard({ mentorEmail }: { mentorEmail: string }
     m.roll_number?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Helper to generate a visual calendar heatmap based on attendance data
   const generateAttendanceHeatmap = (total: number, present: number) => {
-    const absent = Math.max(0, total - present - 2); // Reserving 2 for leaves/OD
+    const absent = Math.max(0, total - present - 2); 
     const leaves = total > present ? 2 : 0;
     
-    // Create an array representing all sessions in the semester
     let sessions = [];
     for (let i = 0; i < present; i++) sessions.push('present');
     for (let i = 0; i < leaves; i++) sessions.push('leave');
     for (let i = 0; i < absent; i++) sessions.push('absent');
     
-    // Shuffle slightly for a realistic calendar look (optional, but nice UI touch)
     sessions.sort(() => Math.random() - 0.5);
     
     return sessions;
@@ -135,7 +143,6 @@ export default function MentorDashboard({ mentorEmail }: { mentorEmail: string }
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {/* 🚀 BUTTON NOW OPENS THE PROFILE MODAL */}
                       <button 
                         onClick={() => setSelectedMentee(student)}
                         className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"
@@ -197,12 +204,11 @@ export default function MentorDashboard({ mentorEmail }: { mentorEmail: string }
         </div>
       </div>
 
-      {/* 🚀 MENTEE PROFILE & CALENDAR MODAL */}
+      {/* MENTEE PROFILE & CALENDAR MODAL */}
       {selectedMentee && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" onClick={() => setSelectedMentee(null)}>
           <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             
-            {/* Header */}
             <div className="bg-gradient-to-r from-slate-900 to-indigo-900 p-6 text-white relative flex items-center gap-6">
               <button onClick={() => setSelectedMentee(null)} className="absolute top-4 right-4 text-white/70 hover:text-white"><X className="h-6 w-6"/></button>
               
@@ -219,10 +225,8 @@ export default function MentorDashboard({ mentorEmail }: { mentorEmail: string }
               </div>
             </div>
 
-            {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
               
-              {/* Academic Overview */}
               <div>
                 <h3 className="text-sm font-bold text-slate-900 border-b border-slate-200 pb-2 mb-4">Academic Overview</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -249,7 +253,6 @@ export default function MentorDashboard({ mentorEmail }: { mentorEmail: string }
                 </div>
               </div>
 
-              {/* 🚀 SEMESTER ATTENDANCE CALENDAR (HEATMAP) */}
               <div>
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-4">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2"><CalendarDays className="h-4 w-4 text-indigo-600"/> Semester Attendance Record</h3>
